@@ -1,0 +1,41 @@
+[project]
+name = "audio-transcription-timecodes"
+version = "1.0.0"
+description = "Extraction de mots et phrases avec timecodes de fichiers audio français"
+authors = [{name = "Yan", email = "yan@example.com"}]
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "openai-whisper>=20231117",
+    "pydub>=0.25.1",
+    "numpy>=1.24.0",
+    "torch>=2.0.0",
+    "librosa>=0.10.0",
+    "scipy>=1.10.0",
+    "tqdm>=4.64.0",
+    "pandas>=2.0.0",
+    "pyannote.audio>=3.1.0",
+    "soundfile>=0.12.1",
+    "speechbrain>=0.5.16"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=23.0.0",
+    "flake8>=6.0.0",
+    "mypy>=1.0.0"
+]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.black]
+line-length = 88
+target-version = ['py39']
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
