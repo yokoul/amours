@@ -88,10 +88,28 @@ audio/*.m4a
 audio/*.flac
 audio/*.ogg
 
-# Output files
-output/*.json
-output/*.csv
-output/*.srt
+# Audio files - Ne pas versionner les fichiers audio
+audio/
+*.mp3
+*.wav
+*.m4a
+*.flac
+*.ogg
+*.aac
+*.wma
+
+# Output directories - Ne pas versionner les résultats
+output*/
+test_output*/
+
+# Specific output patterns
+*.json
+*.csv
+*.srt
+*_complete.json
+*_data.csv
+*_subtitles.srt
+*_words.json
 
 # Whisper model cache
 ~/.cache/whisper/

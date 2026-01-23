@@ -25,7 +25,7 @@ Projet Python d'analyse sémantique avancée pour détecter et classifier les di
 
 ```bash
 # Cloner le projet
-git clone https://github.com/votre-username/amours.git
+git clone https://github.com/yokoul/amours.git
 cd amours
 
 # Créer un environnement virtuel
@@ -178,7 +178,7 @@ Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de 
 ## 📞 Support
 
 Pour toute question ou problème :
-- Ouvrez une [Issue](https://github.com/votre-username/amours/issues)
+- Ouvrez une [Issue](https://github.com/yokoul/amours/issues)
 - Consultez la [Documentation](docs/)
 - Contactez les mainteneurs
 
