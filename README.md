@@ -10,6 +10,7 @@ Projet Python d'analyse sémantique avancée pour détecter et classifier les di
 - **🧠 Analyse sémantique des types d'amour** avec sentence-transformers
 - **📊 Classification en 7 types d'amour** : romantique, familial, amical, spirituel, érotique, narcissique, platonique
 - **🎯 Interface interactive** simplifiée pour tous les workflows
+- **🎨 Mix-Play & Montage** : Système de composition créative de phrases avec randomisation
 - **📄 Export multi-format** : JSON, CSV, SRT (sous-titres), mots avec timecodes
 
 ## 🛠️ Technologies
@@ -67,6 +68,29 @@ python transcribe_audio.py --input audio/fichier.mp3 --reconstruct-sentences
 python analyze_love.py --input output_transcription/fichier_complete.json
 ```
 
+### 🎨 Montage Créatif (Mix-Play)
+
+Le système permet de composer des montages audio à partir des transcriptions :
+
+```bash
+# Montage de phrases par mots-clés (recommandé)
+python examples/phrase_montage.py 3 amour                # 3 phrases contenant "amour"
+python examples/phrase_montage.py 4 bonheur famille      # 4 phrases avec "bonheur" ou "famille"
+
+# Mix-Play mot par mot (avancé)
+python examples/mix_player.py "avec amour et bonheur"    # Compose phrase mot par mot
+
+# Interface interactive pour génération de masse
+python examples/interactive_generator.py                  # Menu interactif
+python examples/batch_generator.py                       # Génération automatique
+```
+
+**Fonctionnalités Mix-Play :**
+- **🎲 Randomisation intelligente** : Chaque génération produit des résultats variés
+- **🎭 Diversification des sources** : Évite les répétitions d'intervenants/fichiers
+- **🔍 Recherche floue** : Trouve des mots similaires (amour ≈ amoureux)
+- **⚡ Qualité ajustable** : Système de scoring pour privilégier les meilleurs extraits
+
 ## 🧠 Types d'Amour Détectés
 
 Le système utilise un modèle sémantique avancé pour identifier 7 types d'amour avec précision :
@@ -108,6 +132,7 @@ Le système utilise un modèle sémantique avancé pour identifier 7 types d'amo
 - **Précision transcription** : 95%+ (audio de bonne qualité)
 - **Détection intervenants** : 85%+ de justesse
 - **Analyse sémantique** : Classification fiable avec seuils ajustables
+- **Mix-Play** : Génération audio 2-5 secondes par phrase
 - **Vitesse** : ~2-3x temps réel (modèle medium)
 
 ## 🏗️ Architecture
@@ -123,7 +148,11 @@ amours/
 ├── output_transcription/        # Transcriptions générées
 ├── output_semantic/            # Analyses sémantiques
 ├── launcher_interactif.py      # Interface utilisateur
-└── examples/                   # Scripts d'exemple
+├── examples/                   # Scripts d'exemple et Mix-Play
+│   ├── phrase_montage.py       # Montage de phrases par mots-clés
+│   ├── mix_player.py          # Composition mot par mot
+│   ├── interactive_generator.py # Interface de génération
+│   └── batch_generator.py     # Génération automatique
 ```
 
 ```json
