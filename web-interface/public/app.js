@@ -58,10 +58,46 @@ class SpectacleApp {
     handleWebSocketMessage(data) {
         switch (data.type) {
             case 'phrase_generated':
-                console.log('🎵 Phrase générée reçue via WebSocket');
+                console.log('🎵 Phrase générée reçue via WebSocket', data.data);
+                
+                // Traiter l'audio si disponible via WebSocket
+                if (data.data && data.data.audio_url) {
+                    this.handleWebSocketAudio(data.data);
+                }
                 break;
             default:
                 console.log('📨 Message WebSocket:', data);
+        }
+    }
+    
+    async handleWebSocketAudio(audioData) {
+        console.log('🎧 Traitement audio WebSocket...', audioData);
+        
+        try {
+            // Utiliser la nouvelle interface audio modulaire avec les données WebSocket
+            if (typeof initializeNewAudioInterface === 'function') {
+                
+                // Initialiser l'interface si pas déjà fait
+                if (!window.audioInterface) {
+                    window.audioInterface = await initializeNewAudioInterface();
+                }
+                
+                // Ajouter le track avec les métadonnées WebSocket
+                const trackId = window.audioInterface.addTrack(audioData.audio_url, {
+                    phrase: audioData.phrase,
+                    keywords: audioData.keywords,
+                    duration_seconds: audioData.duration,
+                    timestamp: new Date().toLocaleTimeString(),
+                    title: audioData.phrase?.text?.substring(0, 50) + '...' || 'Via WebSocket'
+                });
+                
+                console.log(`✅ Track WebSocket ajouté avec ID: ${trackId}`);
+                
+            } else {
+                console.warn('⚠️ Interface audio modulaire non disponible pour WebSocket');
+            }
+        } catch (error) {
+            console.error('❌ Erreur traitement audio WebSocket:', error);
         }
     }
     
@@ -214,12 +250,25 @@ class SpectacleApp {
         }
         
         // Utiliser la nouvelle interface audio modulaire
+        let audioUrl = null;
+        let audioMetadata = {};
+        
+        // Détecter l'audio dans différentes structures possibles
         if (data.audio_url) {
-            await this.setupP5AudioPlayer(data.audio_url, data);
+            audioUrl = data.audio_url;
+            audioMetadata = data;
         } else if (data.result && data.result.audio_url) {
-            await this.setupP5AudioPlayer(data.result.audio_url, data.result);
+            audioUrl = data.result.audio_url;
+            audioMetadata = data.result;
+        } else if (data.has_audio && data.phrases) {
+            // Cas où l'audio est disponible mais pas dans la réponse directe
+            console.log('🔍 Audio détecté mais URL non fournie, attendre WebSocket...');
+        }
+        
+        if (audioUrl) {
+            await this.setupP5AudioPlayer(audioUrl, audioMetadata);
         } else {
-            console.warn('⚠️ Aucun audio disponible dans la réponse');
+            console.warn('⚠️ Aucun audio disponible dans la réponse', Object.keys(data));
         }
         
         resultSection.classList.remove('hidden');
