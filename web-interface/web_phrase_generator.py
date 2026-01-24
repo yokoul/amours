@@ -30,14 +30,7 @@ except ImportError as e:
     print(f"❌ Erreur import phrase_montage: {e}", file=sys.stderr)
     PHRASE_MONTAGE_AVAILABLE = False
 
-# Importer l'analyseur sémantique
-try:
-    sys.path.append(str(parent_dir / "src"))
-    from love_analyzer import LoveTypeAnalyzer
-    LOVE_ANALYZER_AVAILABLE = True
-except ImportError as e:
-    print(f"⚠️ Analyseur sémantique non disponible: {e}", file=sys.stderr)
-    LOVE_ANALYZER_AVAILABLE = False
+# Pas besoin d'importer LoveTypeAnalyzer - les données sont dans les JSON
 
 @dataclass
 class WebPhraseResult:
@@ -72,15 +65,8 @@ class WebPhraseGenerator:
         else:
             self.selector = None
         
-        # Initialiser l'analyseur sémantique
-        if LOVE_ANALYZER_AVAILABLE:
-            self.love_analyzer = LoveTypeAnalyzer(
-                use_semantic_analysis=True,
-                reconstruct_sentences=False  # Pas besoin, on a déjà des phrases
-            )
-            print("✅ Analyseur sémantique initialisé", file=sys.stderr)
-        else:
-            self.love_analyzer = None
+        # Pas besoin de LoveTypeAnalyzer - les données sont déjà dans les JSON
+        self.love_analyzer = None
     
     def generate_web_phrases(self, keywords: List[str], num_phrases: int = 3) -> WebPhraseResult:
         """

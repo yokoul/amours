@@ -224,7 +224,9 @@ class PhraseSelector:
                     end=phrase.end,
                     segment_id=phrase.segment_id,
                     keywords_found=found_keywords,
-                    match_score=match_score
+                    match_score=match_score,
+                    love_type=phrase.love_type,  # Préserver les données sémantiques
+                    love_analysis=phrase.love_analysis  # Préserver les scores d'amour
                 )
                 
                 matches.append(phrase_copy)

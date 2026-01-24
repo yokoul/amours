@@ -4,10 +4,14 @@
    =========================== */
 
 class SpiderMinimal {
-    constructor(containerId, options = {}) {
-        this.container = document.getElementById(containerId);
-        this.canvas = null;
-        this.ctx = null;
+    constructor(canvasId, options = {}) {
+        this.canvas = document.getElementById(canvasId);
+        if (!this.canvas) {
+            console.error(`❌ Canvas #${canvasId} non trouvé`);
+            return;
+        }
+        
+        this.ctx = this.canvas.getContext('2d');
         this.data = null;
         this.animatedData = {};
         this.isAnimating = false;
@@ -34,32 +38,23 @@ class SpiderMinimal {
     }
     
     init() {
-        this.createCanvas();
+        this.setupCanvas();
         this.setupEventListeners();
         console.log('🕷️ Spider minimal initialisé');
     }
     
-    createCanvas() {
-        this.container.innerHTML = `
-            <canvas id="spider-canvas" width="${this.options.size}" height="${this.options.size}"></canvas>
-        `;
-        
-        this.canvas = this.container.querySelector('#spider-canvas');
-        this.ctx = this.canvas.getContext('2d');
-        
-        // Haute résolution
-        const dpr = window.devicePixelRatio || 1;
-        this.canvas.width = this.options.size * dpr;
-        this.canvas.height = this.options.size * dpr;
-        this.canvas.style.width = `${this.options.size}px`;
-        this.canvas.style.height = `${this.options.size}px`;
-        this.ctx.scale(dpr, dpr);
+    setupCanvas() {
+        const size = this.options.size;
+        this.canvas.width = size;
+        this.canvas.height = size;
+        this.canvas.style.width = `${size}px`;
+        this.canvas.style.height = `${size}px`;
         
         this.center = {
-            x: this.options.size / 2,
-            y: this.options.size / 2
+            x: size / 2,
+            y: size / 2
         };
-        this.radius = this.options.size * 0.32;
+        this.radius = size * 0.32;
     }
     
     setupEventListeners() {

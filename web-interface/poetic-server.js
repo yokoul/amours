@@ -234,7 +234,8 @@ class PoeticServer {
                             : `Création avec ${words.join(', ')}`,
                         keywords: words,
                         duration_seconds: result.duration_seconds,
-                        timestamp: result.timestamp || Date.now()
+                        timestamp: result.timestamp || Date.now(),
+                        semantic_analysis: result.semantic_analysis || null
                     });
                     
                 } catch (e) {

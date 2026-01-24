@@ -4,8 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Amour • Interface Poétique</title>
-    <link rel="stylesheet" href="poetic-style.css">
+    <link rel="stylesheet" href="poetic-style.css?v=20260124">
     <meta name="theme-color" content="#000000">
+    <meta http-equiv="cache-control" content="no-cache">
 </head>
 <body>
     <!-- ÉTAT 1: CONTEMPLATION -->
@@ -46,11 +47,12 @@
                         </div>
                     </div>
                     <div class="phrase-display" id="phrase-display" aria-live="polite"></div>
+                    <div class="semantic-data" id="semantic-data"></div>
                 </div>
-                
-                <!-- Visualisation sémantique subtile -->
-                <div class="spider-container" id="spider-container"></div>
             </div>
+            
+            <!-- Visualisation sémantique (toujours dans le DOM) -->
+            <canvas id="spider-canvas" class="spider-viz"></canvas>
             
         </section>
         
@@ -79,7 +81,7 @@
     </main>
     
     <!-- Scripts -->
-    <script src="spider-minimal.js"></script>
-    <script src="poetic-interface.js"></script>
+    <script src="spider-minimal.js?v=2"></script>
+    <script src="poetic-interface.js?v=20260124"></script>
 </body>
 </html>

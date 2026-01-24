@@ -3,6 +3,174 @@
    Architecture de states artistique
    =========================== */
 
+/* ===========================
+   SPIDER MINIMAL - VISUALISATION SÉMANTIQUE
+   =========================== */
+class SpiderMinimal {
+    constructor(canvasId, options = {}) {
+        this.canvas = document.getElementById(canvasId);
+        if (!this.canvas) {
+            console.error(`❌ Canvas #${canvasId} non trouvé`);
+            return;
+        }
+        
+        this.ctx = this.canvas.getContext('2d');
+        this.data = null;
+        this.animatedData = {};
+        this.isAnimating = false;
+        
+        this.options = {
+            size: options.size || 280,
+            categories: options.categories || [
+                'romantique', 'passionnel', 'tendre', 'physique',
+                'platonique', 'familial', 'amical', 'spirituel'
+            ],
+            colors: {
+                background: 'transparent',
+                grid: 'rgba(0, 0, 0, 0.1)',
+                data: 'rgba(0, 0, 0, 0.15)',
+                stroke: 'rgba(0, 0, 0, 0.8)',
+                text: 'rgba(0, 0, 0, 0.7)',
+                points: 'rgba(0, 0, 0, 1)'
+            },
+            ...options
+        };
+        
+        this.setupCanvas();
+        console.log('🕷️ Spider minimal initialisé');
+    }
+    
+    setupCanvas() {
+        const size = this.options.size;
+        this.canvas.width = size;
+        this.canvas.height = size;
+        this.canvas.style.width = `${size}px`;
+        this.canvas.style.height = `${size}px`;
+        
+        this.center = { x: size / 2, y: size / 2 };
+        this.radius = size * 0.32;
+    }
+    
+    setData(newData, animate = true) {
+        if (!newData) return;
+        this.data = this.normalizeData(newData);
+        if (animate && !this.isAnimating) {
+            this.animateToNewData();
+        } else {
+            this.animatedData = {...this.data};
+            this.render();
+        }
+    }
+    
+    normalizeData(data) {
+        const normalized = {};
+        this.options.categories.forEach(cat => {
+            normalized[cat] = data[cat] || 0;
+        });
+        return normalized;
+    }
+    
+    animateToNewData() {
+        this.isAnimating = true;
+        const duration = 800;
+        const startTime = Date.now();
+        const startData = {...this.animatedData};
+        
+        const animate = () => {
+            const elapsed = Date.now() - startTime;
+            const progress = Math.min(elapsed / duration, 1);
+            const eased = progress < 0.5 ? 4 * progress * progress * progress : 1 - Math.pow(-2 * progress + 2, 3) / 2;
+            
+            this.options.categories.forEach(cat => {
+                const start = startData[cat] || 0;
+                const end = this.data[cat] || 0;
+                this.animatedData[cat] = start + (end - start) * eased;
+            });
+            
+            this.render();
+            if (progress < 1) requestAnimationFrame(animate);
+            else this.isAnimating = false;
+        };
+        animate();
+    }
+    
+    render() {
+        const ctx = this.ctx;
+        const {center, radius} = this;
+        
+        ctx.clearRect(0, 0, this.options.size, this.options.size);
+        
+        // Grille
+        ctx.strokeStyle = this.options.colors.grid;
+        ctx.lineWidth = 1;
+        for (let i = 1; i <= 4; i++) {
+            ctx.beginPath();
+            ctx.arc(center.x, center.y, (radius * i) / 4, 0, Math.PI * 2);
+            ctx.stroke();
+        }
+        
+        // Axes
+        const categories = this.options.categories;
+        const angleStep = (Math.PI * 2) / categories.length;
+        for (let i = 0; i < categories.length; i++) {
+            const angle = i * angleStep - Math.PI / 2;
+            ctx.beginPath();
+            ctx.moveTo(center.x, center.y);
+            ctx.lineTo(center.x + Math.cos(angle) * radius, center.y + Math.sin(angle) * radius);
+            ctx.stroke();
+        }
+        
+        // Données
+        if (this.animatedData && Object.keys(this.animatedData).length > 0) {
+            ctx.fillStyle = this.options.colors.data;
+            ctx.strokeStyle = this.options.colors.stroke;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            
+            for (let i = 0; i < categories.length; i++) {
+                const angle = i * angleStep - Math.PI / 2;
+                const value = this.animatedData[categories[i]] || 0;
+                const distance = radius * value;
+                const x = center.x + Math.cos(angle) * distance;
+                const y = center.y + Math.sin(angle) * distance;
+                if (i === 0) ctx.moveTo(x, y);
+                else ctx.lineTo(x, y);
+            }
+            
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+            
+            // Points
+            ctx.fillStyle = this.options.colors.points;
+            for (let i = 0; i < categories.length; i++) {
+                const angle = i * angleStep - Math.PI / 2;
+                const value = this.animatedData[categories[i]] || 0;
+                const distance = radius * value;
+                const x = center.x + Math.cos(angle) * distance;
+                const y = center.y + Math.sin(angle) * distance;
+                ctx.beginPath();
+                ctx.arc(x, y, 3, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+        
+        // Labels
+        ctx.fillStyle = this.options.colors.text;
+        ctx.font = '10px -apple-system, BlinkMacSystemFont, sans-serif';
+        for (let i = 0; i < categories.length; i++) {
+            const angle = i * angleStep - Math.PI / 2;
+            const x = center.x + Math.cos(angle) * (radius + 20);
+            const y = center.y + Math.sin(angle) * (radius + 20);
+            ctx.textAlign = Math.cos(angle) < -0.1 ? 'right' : Math.cos(angle) > 0.1 ? 'left' : 'center';
+            ctx.fillText(categories[i], x, y + 4);
+        }
+    }
+}
+
+/* ===========================
+   INTERFACE PRINCIPALE
+   =========================== */
 class PoeticInterface {
     constructor() {
         this.currentState = 'contemplation';
@@ -309,13 +477,17 @@ class PoeticInterface {
             
             // Transition vers état création
             this.setState('creation');
-            this.setupAudioPlayer({
-                audioFile: audioUrl,
-                phrase: fullPhrase,
-                phrases: result.phrases || [],
-                duration_seconds: result.duration_seconds,
-                semantic_analysis: result.semantic_analysis  // Ajouter l'analyse sémantique
-            });
+            
+            // Attendre que setState finisse son animation (300ms) avant de setup l'audio
+            setTimeout(() => {
+                this.setupAudioPlayer({
+                    audioFile: audioUrl,
+                    phrase: fullPhrase,
+                    phrases: result.phrases || [],
+                    duration_seconds: result.duration_seconds,
+                    semantic_analysis: result.semantic_analysis
+                });
+            }, 350); // Un peu plus que les 300ms de setState
             
             // Sauvegarder dans l'archive
             this.addToArchive({
@@ -374,10 +546,82 @@ class PoeticInterface {
         // Contrôle de lecture
         playBtn.onclick = () => this.togglePlayback();
         
-        // Visualisation sémantique
-        if (data.semantic_analysis) {
-            this.showSemanticVisualization(data.semantic_analysis);
+        // Afficher les barres sémantiques pour chaque phrase
+        if (data.phrases && data.phrases.length > 0) {
+            this.showSemanticBars(data.phrases);
         }
+    }
+    
+    showSemanticBars(phrases) {
+        console.log('📊 Affichage barres sémantiques pour', phrases.length, 'phrases');
+        
+        // Créer ou récupérer le conteneur
+        let container = document.getElementById('semantic-bars');
+        if (!container) {
+            const audioPlayer = document.getElementById('audio-player');
+            container = document.createElement('div');
+            container.id = 'semantic-bars';
+            container.className = 'semantic-bars';
+            audioPlayer.appendChild(container);
+        }
+        
+        container.innerHTML = ''; // Clear
+        
+        // Pour chaque phrase, créer un groupe de barres
+        phrases.forEach((phrase, index) => {
+            if (!phrase.love_analysis) return;
+            
+            const phraseGroup = document.createElement('div');
+            phraseGroup.className = 'phrase-bars';
+            
+            // Titre de la phrase (court)
+            const phraseText = document.createElement('div');
+            phraseText.className = 'phrase-mini';
+            phraseText.textContent = `${index + 1}. ${phrase.text.substring(0, 50)}...`;
+            phraseGroup.appendChild(phraseText);
+            
+            // Conteneur des barres
+            const barsContainer = document.createElement('div');
+            barsContainer.className = 'bars-container';
+            
+            // Créer une barre par type d'amour
+            Object.entries(phrase.love_analysis)
+                .sort((a, b) => b[1] - a[1]) // Trier par valeur décroissante
+                .forEach(([type, value]) => {
+                    const barRow = document.createElement('div');
+                    barRow.className = 'bar-row';
+                    
+                    // Label du type
+                    const label = document.createElement('div');
+                    label.className = 'bar-label';
+                    label.textContent = type;
+                    barRow.appendChild(label);
+                    
+                    // Barre de progression
+                    const barTrack = document.createElement('div');
+                    barTrack.className = 'bar-track';
+                    
+                    const barFill = document.createElement('div');
+                    barFill.className = 'bar-fill';
+                    barFill.style.width = `${value * 100}%`;
+                    barTrack.appendChild(barFill);
+                    barRow.appendChild(barTrack);
+                    
+                    // Pourcentage
+                    const percentage = document.createElement('div');
+                    percentage.className = 'bar-percentage';
+                    percentage.textContent = `${(value * 100).toFixed(0)}%`;
+                    barRow.appendChild(percentage);
+                    
+                    barsContainer.appendChild(barRow);
+                });
+            
+            phraseGroup.appendChild(barsContainer);
+            container.appendChild(phraseGroup);
+        });
+        
+        container.style.display = 'block';
+        console.log('✅ Barres affichées');
     }
     
     showSemanticVisualization(semanticData) {
@@ -388,28 +632,30 @@ class PoeticInterface {
             return;
         }
         
-        // Créer le spider si nécessaire
+        // Créer ou récupérer le spider
+        const canvas = document.getElementById('semantic-canvas');
+        if (!canvas) {
+            console.error('❌ semantic-canvas introuvable');
+            return;
+        }
+        
         if (!this.spider) {
             console.log('🕷️ Création du spider...');
-            this.spider = new SpiderMinimal('spider-container', {
+            this.spider = new SpiderMinimal('semantic-canvas', {
                 size: 280,
                 categories: Object.keys(semanticData)
             });
         }
         
-        // Afficher les données avec animation
-        console.log('🕷️ Affichage des données:', semanticData);
+        // Afficher les données
+        console.log('🕷️ Mise à jour du spider avec:', semanticData);
         this.spider.setData(semanticData, true);
         
-        // Rendre visible avec transition
-        const container = document.getElementById('spider-container');
-        container.style.opacity = '0';
-        container.style.display = 'block';
+        // Rendre visible
+        canvas.style.display = 'block';
+        canvas.style.opacity = '1';
         
-        setTimeout(() => {
-            container.style.opacity = '1';
-            console.log('✅ Spider affiché');
-        }, 300);
+        console.log('✅ Spider affiché');
     }
     
     togglePlayback() {
@@ -713,6 +959,12 @@ class SemanticVisualization {
    =========================== */
 
 document.addEventListener('DOMContentLoaded', () => {
+    // Debug: vérifier que tous les éléments existent
+    console.log('🔍 Vérification du DOM:');
+    console.log('  - spider-canvas:', document.getElementById('spider-canvas'));
+    console.log('  - audio-player:', document.getElementById('audio-player'));
+    console.log('  - word-cloud:', document.getElementById('word-cloud'));
+    
     // Interface principale
     window.poeticInterface = new PoeticInterface();
     
