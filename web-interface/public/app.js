@@ -72,30 +72,42 @@ class SpectacleApp {
     
     async handleWebSocketAudio(audioData) {
         console.log('🎧 Traitement audio WebSocket...', audioData);
+        console.log('🔍 Audio URL reçue:', audioData.audio_url);
         
         try {
-            // Utiliser la nouvelle interface audio modulaire avec les données WebSocket
-            if (typeof initializeNewAudioInterface === 'function') {
-                
-                // Initialiser l'interface si pas déjà fait
-                if (!window.audioInterface) {
-                    window.audioInterface = await initializeNewAudioInterface();
-                }
-                
-                // Ajouter le track avec les métadonnées WebSocket
-                const trackId = window.audioInterface.addTrack(audioData.audio_url, {
-                    phrase: audioData.phrase,
-                    keywords: audioData.keywords,
-                    duration_seconds: audioData.duration,
-                    timestamp: new Date().toLocaleTimeString(),
-                    title: audioData.phrase?.text?.substring(0, 50) + '...' || 'Via WebSocket'
-                });
-                
-                console.log(`✅ Track WebSocket ajouté avec ID: ${trackId}`);
-                
-            } else {
-                console.warn('⚠️ Interface audio modulaire non disponible pour WebSocket');
+            // Vérifier si la fonction d'initialisation existe
+            if (typeof initializeNewAudioInterface !== 'function') {
+                console.error('❌ Fonction initializeNewAudioInterface non disponible');
+                return;
             }
+            
+            // Utiliser la nouvelle interface audio modulaire avec les données WebSocket
+            console.log('🎼 Initialisation de l\'interface audio...');
+                
+            // Initialiser l'interface si pas déjà fait
+            if (!window.audioInterface) {
+                console.log('🎼 Création nouvelle interface audio...');
+                window.audioInterface = await initializeNewAudioInterface();
+                console.log('✅ Interface audio créée:', !!window.audioInterface);
+            }
+            
+            if (!audioData.audio_url) {
+                console.warn('⚠️ Pas d\'audio_url dans les données WebSocket');
+                return;
+            }
+            
+            // Ajouter le track avec les métadonnées WebSocket
+            console.log('🎵 Ajout du track WebSocket...');
+            const trackId = window.audioInterface.addTrack(audioData.audio_url, {
+                phrase: audioData.phrase,
+                keywords: audioData.keywords,
+                duration_seconds: audioData.duration,
+                timestamp: new Date().toLocaleTimeString(),
+                title: audioData.phrase?.text?.substring(0, 50) + '...' || 'Via WebSocket'
+            });
+            
+            console.log(`✅ Track WebSocket ajouté avec ID: ${trackId}`);
+                
         } catch (error) {
             console.error('❌ Erreur traitement audio WebSocket:', error);
         }
@@ -260,15 +272,17 @@ class SpectacleApp {
         } else if (data.result && data.result.audio_url) {
             audioUrl = data.result.audio_url;
             audioMetadata = data.result;
-        } else if (data.has_audio && data.phrases) {
-            // Cas où l'audio est disponible mais pas dans la réponse directe
-            console.log('🔍 Audio détecté mais URL non fournie, attendre WebSocket...');
+        } else if (data.has_audio === true && data.phrases) {
+            // Cas où l'audio est disponible mais pas dans la réponse directe (arrivera via WebSocket)
+            console.log('🔍 Audio détecté (has_audio=true) mais URL non fournie, sera reçu via WebSocket...');
+        } else if (data.has_audio === false) {
+            console.log('ℹ️ Aucun audio généré pour cette requête (has_audio=false)');
+        } else {
+            console.warn('⚠️ Aucun audio disponible dans la réponse', Object.keys(data));
         }
         
         if (audioUrl) {
             await this.setupP5AudioPlayer(audioUrl, audioMetadata);
-        } else {
-            console.warn('⚠️ Aucun audio disponible dans la réponse', Object.keys(data));
         }
         
         resultSection.classList.remove('hidden');

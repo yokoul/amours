@@ -128,17 +128,20 @@ app.post('/api/generate-phrase', async (req, res) => {
                         }
                     }
                     
-                    // Broadcaster le résultat à tous les clients
+                    // Broadcaster le résultat à tous les clients APRÈS création audio
                     if (result.phrases && result.phrases.length > 0) {
-                        broadcast({
+                        const broadcastData = {
                             type: 'phrase_generated',
                             data: {
                                 phrase: result.phrases[0],
-                                keywords: words, // Utiliser 'words' du req.body
-                                audio_url: safeResponse.audio_url,
+                                keywords: words,
+                                audio_url: safeResponse.audio_url, // Maintenant défini
                                 duration: result.duration_seconds
                             }
-                        });
+                        };
+                        
+                        console.log('📡 Broadcasting avec audio_url:', safeResponse.audio_url);
+                        broadcast(broadcastData);
                     }
                     
                     res.json(safeResponse);

@@ -385,7 +385,8 @@
 }
 
 /* === CONTAINER PRINCIPAL === */
-.new-audio-interface {
+.new-audio-interface,
+.audio-interface {
     display: grid;
     grid-template-columns: 1fr 1fr;
     grid-template-rows: auto auto;
@@ -411,7 +412,8 @@
 
 /* === RESPONSIVE === */
 @media (max-width: 768px) {
-    .new-audio-interface {
+    .new-audio-interface,
+    .audio-interface {
         grid-template-columns: 1fr;
         gap: 15px;
         padding: 12px;
@@ -517,7 +519,8 @@
 }
 
 @media (max-width: 480px) {
-    .new-audio-interface {
+    .new-audio-interface,
+    .audio-interface {
         padding: 8px;
         gap: 8px;
         box-sizing: border-box;
