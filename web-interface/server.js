@@ -100,7 +100,7 @@ app.post('/api/generate-phrase', async (req, res) => {
                     const safeResponse = {
                         success: true,
                         phrases: result.phrases || [],
-                        keywords: result.keywords || selectedWords,
+                        keywords: result.keywords || words, // Utiliser 'words' du req.body
                         timestamp: result.timestamp,
                         duration_seconds: result.duration_seconds,
                         error: result.error,
@@ -134,7 +134,7 @@ app.post('/api/generate-phrase', async (req, res) => {
                             type: 'phrase_generated',
                             data: {
                                 phrase: result.phrases[0],
-                                keywords: selectedWords,
+                                keywords: words, // Utiliser 'words' du req.body
                                 audio_url: safeResponse.audio_url,
                                 duration: result.duration_seconds
                             }
@@ -153,16 +153,8 @@ app.post('/api/generate-phrase', async (req, res) => {
                         error: 'Erreur de traitement de la réponse Python',
                         debug: {
                             outputLength: output.length,
-                            hasJSON: output.includes('{') && output.includes('}')
-                        }
-                    });
-                    
-                    res.status(500).json({
-                        success: false,
-                        error: "Erreur de format de réponse Python",
-                        debug: {
+                            hasJSON: output.includes('{') && output.includes('}'),
                             outputType: typeof output,
-                            outputLength: output.length,
                             firstChars: output.substring(0, 100)
                         }
                     });
