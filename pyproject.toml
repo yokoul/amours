@@ -1,6 +1,6 @@
 [project]
 name = "audio-transcription-timecodes"
-version = "1.0.0"
+version = "1.1.0"
 description = "Extraction de mots et phrases avec timecodes de fichiers audio français"
 authors = [{name = "Yan", email = "yan@example.com"}]
 readme = "README.md"

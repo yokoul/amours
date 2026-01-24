@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, maximum-scale=5.0">
+    <title>Spectacle d'Amour - Générez vos phrases</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="components/components.css">
+</head>
+<body>
+    <div id="app">
+        <!-- Interface principale -->
+        <header>
+            <h1>💕 Construisez vos phrases d'amour 💕</h1>
+            <p>Touchez les mots qui vous inspirent</p>
+        </header>
+        
+        <main>
+            <!-- Damier de mots -->
+            <section id="word-grid" class="word-grid">
+                <!-- Généré dynamiquement par JavaScript -->
+            </section>
+            
+            <!-- Mots sélectionnés -->
+            <section id="selected-words" class="selected-words">
+                <h3>Vos mots choisis :</h3>
+                <div id="selected-list"></div>
+                <button id="clear-selection" class="btn-secondary">Effacer</button>
+            </section>
+            
+            <!-- Contrôles -->
+            <section id="controls" class="controls">
+                <button id="generate-btn" class="btn-primary" disabled>
+                    🎭 Générer vos phrases
+                </button>
+                <button id="refresh-words" class="btn-secondary">
+                    🔄 Nouveaux mots
+                </button>
+            </section>
+            
+            <!-- Résultat -->
+            <section id="result" class="result hidden">
+                <!-- INTERFACE AUDIO EN PREMIER - PRIORITÉ AU SON -->
+                <div id="audio-interface-container" class="audio-interface">
+                    <!-- Les composants seront injectés ici par JavaScript -->
+                </div>
+                
+                <!-- Phrases générées - format compact -->
+                <details id="phrase-details" class="phrase-section">
+                    <summary class="phrase-summary">
+                        <h4>📝 Phrases générées</h4>
+                        <span class="expand-hint">Cliquer pour voir le détail</span>
+                    </summary>
+                    <div id="phrase-output" class="phrase-content"></div>
+                </details>
+                
+                <button id="new-creation" class="btn-primary">
+                    ✨ Nouvelle création
+                </button>
+            </section>
+        </main>
+        
+        <!-- Loading spinner -->
+        <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <p>Création de votre poème en cours...</p>
+        </div>
+        
+        <!-- Status bar -->
+        <footer id="status">
+            <p>🔴 Spectacle en direct - Connexion active</p>
+        </footer>
+    </div>
+
+    <!-- NOUVEAUX COMPOSANTS MODULAIRES -->
+    <script src="components/html5-audio-player.js"></script>
+    <script src="components/spider-semantic.js"></script>
+    <script src="components/simple-audio-visualizer.js"></script>
+    <script src="components/audio-interface.js"></script>
+    
+    <!-- Scripts principaux -->
+    <script src="app.js"></script>
+</body>
+</html>
