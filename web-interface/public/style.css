@@ -206,9 +206,11 @@ header p {
     background: rgba(0, 0, 0, 0.3);
     backdrop-filter: blur(10px);
     border-radius: 15px;
-    padding: 25px;
+    padding: 20px;
     margin-bottom: 20px;
     text-align: center;
+    width: 100%;
+    box-sizing: border-box;
 }
 
 .result h3 {
@@ -438,6 +440,11 @@ footer {
 @media (max-width: 480px) {
     #app {
         padding: 15px;
+    }
+    
+    .result {
+        padding: 15px;
+        margin-bottom: 15px;
     }
     
     .word-grid {
