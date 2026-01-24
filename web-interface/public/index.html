@@ -40,13 +40,19 @@
             
             <!-- Résultat -->
             <section id="result" class="result hidden">
-                <h3>Votre création :</h3>
-                <div id="phrase-output"></div>
-                
-                <!-- NOUVELLE INTERFACE AUDIO MODULAIRE -->
+                <!-- INTERFACE AUDIO EN PREMIER - PRIORITÉ AU SON -->
                 <div id="audio-interface-container" class="audio-interface">
                     <!-- Les composants seront injectés ici par JavaScript -->
                 </div>
+                
+                <!-- Phrases générées - format compact -->
+                <details id="phrase-details" class="phrase-section">
+                    <summary class="phrase-summary">
+                        <h4>📝 Phrases générées</h4>
+                        <span class="expand-hint">Cliquer pour voir le détail</span>
+                    </summary>
+                    <div id="phrase-output" class="phrase-content"></div>
+                </details>
                 
                 <button id="new-creation" class="btn-primary">
                     ✨ Nouvelle création

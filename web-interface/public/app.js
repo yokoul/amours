@@ -204,10 +204,13 @@ class SpectacleApp {
         // Afficher les phrases générées
         if (data.phrases && data.phrases.length > 0) {
             phraseOutput.innerHTML = this.formatPhrases(data.phrases);
+            this.expandPhraseSection(data.phrases.length);
         } else if (data.result && data.result.phrases) {
             phraseOutput.innerHTML = this.formatPhrases(data.result.phrases);
+            this.expandPhraseSection(data.result.phrases.length);
         } else {
             phraseOutput.innerHTML = '<p>Phrases générées avec succès!</p>';
+            this.expandPhraseSection(1);
         }
         
         // Utiliser la nouvelle interface audio modulaire
@@ -289,6 +292,21 @@ class SpectacleApp {
             `;
         } else {
             console.warn('⚠️ Container audio-interface-container non trouvé');
+        }
+    }
+    
+    expandPhraseSection(phraseCount) {
+        const phraseDetails = document.getElementById('phrase-details');
+        if (phraseDetails) {
+            // Ouvrir automatiquement si peu de phrases, sinon laisser fermé pour plus de discrétion
+            phraseDetails.open = phraseCount <= 3;
+            
+            // Mettre à jour le texte du summary
+            const summary = phraseDetails.querySelector('.phrase-summary h4');
+            if (summary) {
+                const countText = phraseCount > 1 ? `${phraseCount} phrases` : '1 phrase';
+                summary.innerHTML = `📝 ${countText} générées`;
+            }
         }
     }
     

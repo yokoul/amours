@@ -439,7 +439,6 @@ class SpiderSemantic {
         
         return `${(min * 100).toFixed(1)}% - ${(max * 100).toFixed(1)}%`;
     }
-    }
     
     handleClick(e) {
         const rect = this.canvas.getBoundingClientRect();
