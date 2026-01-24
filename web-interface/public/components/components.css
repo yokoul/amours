@@ -7,7 +7,9 @@
     padding: 20px;
     border: 2px solid rgba(255, 255, 255, 0.2);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    width: 100%;
     max-width: 100%;
+    box-sizing: border-box;
     margin: 20px 0;
 }
 
@@ -247,6 +249,9 @@
     padding: 20px;
     border: 2px solid rgba(255, 255, 255, 0.2);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
     text-align: center;
     margin: 20px 0;
 }
@@ -300,6 +305,9 @@
     padding: 20px;
     border: 2px solid rgba(255, 255, 255, 0.2);
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
     text-align: center;
     margin: 20px 0;
 }
@@ -382,8 +390,10 @@
     grid-template-columns: 1fr 1fr;
     grid-template-rows: auto auto;
     gap: 20px;
-    max-width: 1200px;
-    margin: 0 auto;
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    margin: 0;
     padding: 20px;
 }
 
@@ -508,6 +518,7 @@
     .new-audio-interface {
         padding: 10px;
         gap: 10px;
+        box-sizing: border-box;
     }
     
     .html5-player,
@@ -515,6 +526,8 @@
     .simple-visualizer {
         padding: 12px;
         margin: 10px 0;
+        width: 100%;
+        box-sizing: border-box;
     }
     
     /* Player très petit écran */
