@@ -80,6 +80,24 @@ body {
    ÉTAT 1: CONTEMPLATION
    =========================== */
 
+.vertical-title {
+    position: fixed;
+    left: var(--space-m);
+    top: 50%;
+    transform: translateY(-50%) rotate(-90deg);
+    font-size: 24px;
+    font-weight: 300;
+    letter-spacing: 0.3em;
+    opacity: 0.3;
+    pointer-events: none;
+    transition: opacity var(--slow-transition);
+}
+
+[data-state="inspiration"] .vertical-title,
+[data-state="creation"] .vertical-title {
+    opacity: 0;
+}
+
 .entry-point {
     position: absolute;
     top: 50%;

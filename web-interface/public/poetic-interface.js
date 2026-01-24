@@ -494,7 +494,7 @@ class PoeticInterface {
                 words: [...this.selectedWords],
                 phrase: fullPhrase,
                 audioFile: audioUrl,
-                timestamp: result.timestamp || Date.now(),
+                duration: result.duration_seconds || 0,
                 phrases: result.phrases || []
             });
             
@@ -750,15 +750,8 @@ class PoeticInterface {
             const itemEl = document.createElement('div');
             itemEl.className = 'archive-item';
             
-            const date = new Date(item.timestamp).toLocaleDateString('fr-FR', {
-                day: 'numeric',
-                month: 'short',
-                hour: '2-digit',
-                minute: '2-digit'
-            });
-            
             itemEl.innerHTML = `
-                <div class="archive-meta">${date} • ${item.words.join(' + ')}</div>
+                <div class="archive-meta">${item.words.join(' + ')}</div>
                 <div class="archive-phrase">${item.phrase}</div>
             `;
             
