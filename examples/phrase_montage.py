@@ -16,6 +16,15 @@ from pydub import AudioSegment
 import difflib
 import random
 import math
+import time
+
+try:
+    from mutagen.mp3 import MP3
+    from mutagen.id3 import ID3, TIT2, TPE1, TALB, TDRC, TCON, COMM
+    MUTAGEN_AVAILABLE = True
+except ImportError:
+    MUTAGEN_AVAILABLE = False
+    print("⚠️ mutagen non disponible - métadonnées MP3 désactivées")
 
 # Ajouter le répertoire src au path
 sys.path.append(str(Path(__file__).parent.parent / "src"))
@@ -32,15 +41,20 @@ class PhraseMatch:
     segment_id: int
     keywords_found: List[str]
     match_score: float
+    love_type: Optional[str] = None  # Type d'amour dominant
 
 class PhraseSelector:
     """Sélecteur et monteur de phrases complètes"""
     
-    def __init__(self, transcription_dir: str = "output_transcription", audio_dir: str = "audio"):
+    def __init__(self, transcription_dir: str = "output_transcription", 
+                 semantic_dir: str = "output_semantic", 
+                 audio_dir: str = "audio"):
         self.transcription_dir = Path(transcription_dir)
+        self.semantic_dir = Path(semantic_dir)
         self.audio_dir = Path(audio_dir)
         self.phrases: List[PhraseMatch] = []
         self.audio_cache: Dict[str, AudioSegment] = {}
+        self.semantic_data: Dict[str, Dict] = {}  # Cache pour les données sémantiques
         
     def load_phrases(self):
         """Charge toutes les phrases des transcriptions"""
@@ -52,6 +66,24 @@ class PhraseSelector:
             self._load_phrases_from_file(json_file)
         
         print(f"✅ {len(self.phrases)} phrases chargées depuis {len(json_files)} fichiers")
+        self._load_semantic_data()
+        
+    def _load_semantic_data(self):
+        """Charge les analyses sémantiques correspondantes"""
+        semantic_files = list(self.semantic_dir.glob("*_love_analysis.json"))
+        
+        for semantic_file in semantic_files:
+            # Extraire le nom de base du fichier
+            base_name = semantic_file.name.replace("_with_speakers_love_analysis_love_analysis.json", "")
+            
+            try:
+                with open(semantic_file, 'r', encoding='utf-8') as f:
+                    semantic_data = json.load(f)
+                self.semantic_data[base_name] = semantic_data
+            except Exception as e:
+                print(f"⚠️ Erreur chargement sémantique {semantic_file.name}: {e}")
+        
+        print(f"📊 {len(self.semantic_data)} analyses sémantiques chargées")
         
     def _load_phrases_from_file(self, json_path: Path):
         """Charge les phrases d'un fichier de transcription"""
@@ -85,7 +117,8 @@ class PhraseSelector:
                     end=segment['end'],
                     segment_id=segment['id'],
                     keywords_found=[],
-                    match_score=0.0
+                    match_score=0.0,
+                    love_type=None  # Sera enrichi plus tard
                 )
                 
                 self.phrases.append(phrase)
@@ -171,12 +204,12 @@ class PhraseSelector:
         # Trier par score décroissant
         matches.sort(key=lambda x: x.match_score, reverse=True)
         
-        # Ajouter une variation aléatoire légère aux scores similaires
-        # pour éviter de toujours sélectionner les mêmes phrases
+        # Ajouter une variation aléatoire plus importante pour forcer la diversité
+        # même sur des requêtes identiques répétées
         if len(matches) > max_results:
             for match in matches:
-                # Petite variation aléatoire (±5% du score)
-                variation = random.uniform(-0.05, 0.05) * match.match_score
+                # Variation aléatoire plus forte (±15% au lieu de ±5%) pour plus de variation
+                variation = random.uniform(-0.15, 0.15) * match.match_score
                 match.match_score += variation
             
             # Re-trier avec les scores légèrement variés
@@ -271,7 +304,8 @@ class PhraseSelector:
                               gap_duration: float = 1.5,
                               fade_in_duration: float = 0.3,
                               fade_out_duration: float = 0.3,
-                              normalize: str = "rms") -> str:
+                              normalize: str = "rms",
+                              keywords: List[str] = None) -> str:
         """
         Génère un montage audio des phrases sélectionnées
         
@@ -336,6 +370,10 @@ class PhraseSelector:
         
         final_audio.export(str(output_path), format="mp3", bitrate="192k")
         
+        # Ajouter les métadonnées détaillées
+        self._add_mp3_metadata(str(output_path), phrases, keywords or [], 
+                             len(final_audio) / 1000.0)
+        
         duration = len(final_audio) / 1000.0
         print(f"✅ Montage généré: {output_path.name}")
         print(f"⏱️ Durée totale: {duration:.1f}s")
@@ -383,23 +421,126 @@ class PhraseSelector:
             return audio
         
         return audio  # Méthode inconnue, retourner tel quel
+    
+    def _add_mp3_metadata(self, mp3_path: str, phrases: List[PhraseMatch], 
+                         keywords: List[str], duration: float):
+        """Ajoute les métadonnées complètes au fichier MP3"""
+        if not MUTAGEN_AVAILABLE:
+            return
+            
+        try:
+            audio_file = MP3(mp3_path, ID3=ID3)
+            
+            # Créer les tags ID3 si inexistants
+            if audio_file.tags is None:
+                audio_file.add_tags()
+            
+            # Informations de base
+            audio_file.tags.add(TIT2(encoding=3, text=f"Montage: {', '.join(keywords)}"))
+            audio_file.tags.add(TPE1(encoding=3, text="Amours Mix-Play"))
+            audio_file.tags.add(TALB(encoding=3, text="Generated Montages"))
+            audio_file.tags.add(TDRC(encoding=3, text=str(datetime.now().year)))
+            audio_file.tags.add(TCON(encoding=3, text="Speech/Podcast"))
+            
+            # Statistiques générales avec des tags personnalisés
+            intervenants = list(set(p.speaker for p in phrases))
+            fichiers = list(set(Path(p.file_name).stem for p in phrases))
+            
+            # Métadonnées globales structurées
+            audio_file.tags.add(COMM(encoding=3, lang='fra', desc='amour_search', text=', '.join(keywords)))
+            audio_file.tags.add(COMM(encoding=3, lang='fra', desc='amour_duration', text=f"{duration:.1f}s"))
+            audio_file.tags.add(COMM(encoding=3, lang='fra', desc='amour_speakers', text=', '.join(intervenants)))
+            audio_file.tags.add(COMM(encoding=3, lang='fra', desc='amour_sources', text=', '.join(fichiers)))
+            audio_file.tags.add(COMM(encoding=3, lang='fra', desc='amour_count', text=str(len(phrases))))
+            
+            # Métadonnées détaillées pour chaque phrase
+            for i, phrase in enumerate(phrases, 1):
+                prefix = f"amour_phrase{i}"
+                
+                # Texte de la phrase
+                audio_file.tags.add(COMM(encoding=3, lang='fra', desc=f'{prefix}_text', 
+                                       text=phrase.text))
+                
+                # Mots-clés trouvés
+                audio_file.tags.add(COMM(encoding=3, lang='fra', desc=f'{prefix}_keywords', 
+                                       text=', '.join(phrase.keywords_found)))
+                
+                # Source et intervenant
+                audio_file.tags.add(COMM(encoding=3, lang='fra', desc=f'{prefix}_source', 
+                                       text=Path(phrase.file_name).stem))
+                audio_file.tags.add(COMM(encoding=3, lang='fra', desc=f'{prefix}_speaker', 
+                                       text=phrase.speaker))
+                
+                # Score et timecodes
+                audio_file.tags.add(COMM(encoding=3, lang='fra', desc=f'{prefix}_score', 
+                                       text=f"{phrase.match_score:.1f}"))
+                audio_file.tags.add(COMM(encoding=3, lang='fra', desc=f'{prefix}_start', 
+                                       text=f"{phrase.start:.1f}s"))
+                audio_file.tags.add(COMM(encoding=3, lang='fra', desc=f'{prefix}_end', 
+                                       text=f"{phrase.end:.1f}s"))
+                audio_file.tags.add(COMM(encoding=3, lang='fra', desc=f'{prefix}_duration', 
+                                       text=f"{phrase.end-phrase.start:.1f}s"))
+                audio_file.tags.add(COMM(encoding=3, lang='fra', desc=f'{prefix}_segment_id', 
+                                       text=str(phrase.segment_id)))
+            
+            audio_file.save()
+            print(f"📋 Métadonnées structurées ajoutées au MP3 ({len(phrases)} phrases)")
+            
+        except Exception as e:
+            print(f"⚠️ Erreur métadonnées MP3: {e}")
+    
+    def _get_love_emoji(self, love_type: str) -> str:
+        """Retourne l'emoji correspondant au type d'amour"""
+        love_emojis = {
+            "romantique": "💕",
+            "familial": "👨‍👩‍👧‍👦", 
+            "amical": "🤝",
+            "spirituel": "🙏",
+            "erotique": "🔥",
+            "narcissique": "🪞",
+            "platonique": "📚",
+            "compassionnel": "🤗"
+        }
+        return love_emojis.get(love_type, "💖")
 
 def main():
     """Interface en ligne de commande"""
     
+    # Initialiser seed aléatoire basé sur l'horodatage pour garantir la variation
+    seed = int(time.time() * 1000000) % 2147483647  # Utiliser les microsecondes
+    random.seed(seed)
+    print(f"🎲 Seed aléatoire: {seed}")
+    
     if len(sys.argv) < 3:
-        print("Usage: python phrase_montage.py <nombre_phrases> <mot-clé1> [mot-clé2] [mot-clé3] ...")
+        print("Usage: python phrase_montage.py <nombre_phrases> <mot-clé1> [mot-clé2] [--love-type type1,type2]")
         print()
         print("Exemples:")
         print("  python phrase_montage.py 3 amour")
         print("  python phrase_montage.py 5 amour vie bonheur")
-        print("  python phrase_montage.py 2 bonjour salut")
+        print("  python phrase_montage.py 3 relation --love-type romantique,familial")
+        print("  python phrase_montage.py 4 passion --love-type erotique")
+        print()
+        print("Types d'amour disponibles:")
+        print("  romantique, familial, amical, spirituel, erotique, narcissique, platonique, compassionnel")
         sys.exit(1)
     
     try:
-        num_phrases = int(sys.argv[1])
-        keywords = sys.argv[2:]
-    except ValueError:
+        # Séparer les arguments normaux des options
+        args = sys.argv[1:]
+        love_types = None
+        
+        # Chercher --love-type dans les arguments
+        if '--love-type' in args:
+            love_type_index = args.index('--love-type')
+            if love_type_index + 1 < len(args):
+                love_types_str = args[love_type_index + 1]
+                love_types = [t.strip() for t in love_types_str.split(',')]
+                # Retirer --love-type et sa valeur des arguments
+                args = args[:love_type_index] + args[love_type_index + 2:]
+        
+        num_phrases = int(args[0])
+        keywords = args[1:]
+    except (ValueError, IndexError):
         print("❌ Le nombre de phrases doit être un entier")
         sys.exit(1)
     
@@ -410,10 +551,10 @@ def main():
     selector = PhraseSelector()
     selector.load_phrases()
     
-    # Rechercher les phrases
+    # Rechercher les phrases avec plus de variation
     matches = selector.search_phrases(
         keywords, 
-        max_results=num_phrases * 3,  # Plus de candidats
+        max_results=num_phrases * 5,  # Encore plus de candidats pour plus de variation
         max_duration=15.0,  # Maximum 15 secondes par phrase
         diversify_sources=True  # Diversifier les sources
     )
@@ -449,7 +590,8 @@ def main():
             gap_duration=1.5,  # 1.5s de silence entre phrases
             fade_in_duration=0.2,
             fade_out_duration=0.2,
-            normalize="rms"  # Normalisation RMS pour équilibrer les volumes
+            normalize="rms",  # Normalisation RMS pour équilibrer les volumes
+            keywords=keywords  # Passer les mots-clés pour métadonnées
         )
         
         print(f"🎧 Lecture automatique...")

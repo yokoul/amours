@@ -1,0 +1,537 @@
+/* Interface mobile pour spectacle d'amour */
+:root {
+    --primary-color: #ff6b9d;
+    --secondary-color: #4ecdc4;
+    --accent-color: #ffe66d;
+    --dark-color: #2c3e50;
+    --light-color: #ffffff;
+    --gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Arial', sans-serif;
+    background: var(--gradient);
+    min-height: 100vh;
+    /* IMPORTANT: Permettre le scroll mobile partout */
+    touch-action: manipulation;
+    -webkit-overflow-scrolling: touch;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+    color: var(--light-color);
+    overflow-x: hidden;
+    position: relative;
+}
+
+/* Container P5.js en arrière-plan */
+#p5-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: -1;
+}
+
+/* Layout principal */
+#app {
+    position: relative;
+    z-index: 10;
+    padding: 20px;
+    max-width: 100%;
+}
+
+header {
+    text-align: center;
+    margin-bottom: 30px;
+    animation: fadeInDown 1s ease-out;
+}
+
+header h1 {
+    font-size: 1.8rem;
+    margin-bottom: 10px;
+    text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+}
+
+header p {
+    font-size: 1rem;
+    opacity: 0.9;
+}
+
+/* Damier de mots */
+.word-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 30px;
+    animation: fadeInUp 1s ease-out;
+}
+
+.word-tile {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 15px;
+    padding: 15px 10px;
+    text-align: center;
+    font-size: 0.9rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    user-select: none;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    min-height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.word-tile:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+}
+
+.word-tile:active {
+    transform: translateY(0);
+    box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+}
+
+.word-tile.selected {
+    background: var(--primary-color);
+    border-color: var(--light-color);
+    transform: scale(1.05);
+    animation: pulse 0.5s ease-in-out;
+}
+
+.word-tile.amour {
+    background: var(--accent-color);
+    color: var(--dark-color);
+    font-size: 1.1rem;
+    border-width: 3px;
+}
+
+/* Mots sélectionnés */
+.selected-words {
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(10px);
+    border-radius: 15px;
+    padding: 20px;
+    margin-bottom: 20px;
+    min-height: 100px;
+}
+
+.selected-words h3 {
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+    text-align: center;
+}
+
+#selected-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    margin-bottom: 15px;
+    min-height: 40px;
+    align-items: center;
+}
+
+.selected-word {
+    background: var(--primary-color);
+    padding: 8px 12px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: bold;
+    animation: slideIn 0.3s ease-out;
+}
+
+/* Contrôles */
+.controls {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.btn-primary, .btn-secondary {
+    padding: 15px 25px;
+    border: none;
+    border-radius: 25px;
+    font-size: 1rem;
+    font-weight: bold;
+    cursor: pointer;
+    margin: 5px 10px;
+    min-width: 200px;
+    transition: all 0.3s ease;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.btn-primary {
+    background: var(--primary-color);
+    color: white;
+    box-shadow: 0 4px 15px rgba(255, 107, 157, 0.4);
+}
+
+.btn-primary:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(255, 107, 157, 0.6);
+}
+
+.btn-primary:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* Résultat */
+.result {
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(10px);
+    border-radius: 15px;
+    padding: 25px;
+    margin-bottom: 20px;
+    text-align: center;
+}
+
+.result h3 {
+    margin-bottom: 20px;
+    color: var(--accent-color);
+}
+
+#phrase-output {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+    font-size: 1.1rem;
+    line-height: 1.5;
+    text-align: left;
+}
+
+/* Audio player */
+#audio-player {
+    margin: 20px 0;
+}
+
+#audio-player audio {
+    width: 100%;
+    border-radius: 10px;
+}
+
+.audio-controls {
+    text-align: center;
+}
+
+.audio-controls h4 {
+    margin-bottom: 15px;
+    color: var(--accent-color);
+}
+
+.audio-info {
+    margin-top: 10px;
+    opacity: 0.8;
+}
+
+/* Phrases styling */
+.phrase-item {
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 15px;
+    margin-bottom: 15px;
+    border-left: 3px solid var(--primary-color);
+}
+
+.phrase-text {
+    font-size: 1.1rem;
+    line-height: 1.4;
+    margin-bottom: 10px;
+    font-style: italic;
+}
+
+.phrase-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    font-size: 0.85rem;
+    opacity: 0.8;
+}
+
+.phrase-meta span {
+    display: inline-block;
+}
+
+.speaker {
+    color: var(--secondary-color);
+}
+
+.keywords {
+    color: var(--accent-color);
+}
+
+.score {
+    color: var(--light-color);
+}
+
+/* Loading */
+.loading {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    backdrop-filter: blur(5px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.spinner {
+    width: 50px;
+    height: 50px;
+    border: 4px solid rgba(255, 255, 255, 0.3);
+    border-top: 4px solid var(--primary-color);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-bottom: 20px;
+}
+
+/* Footer status */
+footer {
+    text-align: center;
+    padding: 15px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    font-size: 0.9rem;
+}
+
+/* Utilitaires */
+.hidden {
+    display: none !important;
+}
+
+/* Animations */
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: scale(0);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes pulse {
+    0%, 100% {
+        transform: scale(1.05);
+    }
+    50% {
+        transform: scale(1.1);
+    }
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+    .word-grid {
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+    }
+    
+    .word-tile {
+        padding: 12px 8px;
+        font-size: 0.8rem;
+        min-height: 55px;
+    }
+    
+    .btn-primary, .btn-secondary {
+        min-width: 160px;
+        font-size: 0.9rem;
+    }
+    
+    header h1 {
+        font-size: 1.5rem;
+    }
+}
+
+/* Feedback tactile pour mobile */
+.word-tile:active,
+.btn-primary:active,
+.btn-secondary:active {
+    transform: scale(0.98);
+}
+
+/* Animation d'apparition des tuiles */
+.word-tile {
+    animation: tileAppear 0.6s ease-out forwards;
+    opacity: 0;
+}
+
+.word-tile:nth-child(1) { animation-delay: 0.1s; }
+.word-tile:nth-child(2) { animation-delay: 0.2s; }
+.word-tile:nth-child(3) { animation-delay: 0.3s; }
+.word-tile:nth-child(4) { animation-delay: 0.4s; }
+.word-tile:nth-child(5) { animation-delay: 0.5s; }
+.word-tile:nth-child(6) { animation-delay: 0.6s; }
+.word-tile:nth-child(7) { animation-delay: 0.7s; }
+.word-tile:nth-child(8) { animation-delay: 0.8s; }
+.word-tile:nth-child(9) { animation-delay: 0.9s; }
+.word-tile:nth-child(10) { animation-delay: 1.0s; }
+.word-tile:nth-child(11) { animation-delay: 1.1s; }
+.word-tile:nth-child(12) { animation-delay: 1.2s; }
+.word-tile:nth-child(13) { animation-delay: 1.3s; }
+.word-tile:nth-child(14) { animation-delay: 1.4s; }
+.word-tile:nth-child(15) { animation-delay: 1.5s; }
+.word-tile:nth-child(16) { animation-delay: 1.6s; }
+.word-tile:nth-child(17) { animation-delay: 1.7s; }
+.word-tile:nth-child(18) { animation-delay: 1.8s; }
+.word-tile:nth-child(19) { animation-delay: 1.9s; }
+.word-tile:nth-child(20) { animation-delay: 2.0s; }
+
+@keyframes tileAppear {
+    from {
+        opacity: 0;
+        transform: translateY(20px) rotate(-5deg);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) rotate(0deg);
+    }
+}
+
+/* Player Audio p5.js */
+.p5-audio-player {
+    margin: 20px 0;
+    border-radius: 15px;
+    overflow: hidden;
+    background: rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#p5-audio-container {
+    position: relative;
+    width: 100%;
+    max-width: 800px;
+    height: 600px;
+    margin: 20px auto;
+    display: flex;
+    justify-content: center;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    border-radius: 12px;
+    overflow: hidden;
+    background: linear-gradient(135deg, 
+        rgba(60, 20, 100, 0.3) 0%, 
+        rgba(120, 50, 150, 0.3) 50%,
+        rgba(180, 80, 200, 0.3) 100%);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    /* IMPORTANT: Permettre le scroll sur mobile */
+    touch-action: manipulation;
+    -webkit-overflow-scrolling: touch;
+}
+
+#p5-audio-container canvas {
+    border-radius: 15px;
+    cursor: pointer;
+    /* Permettre les interactions tactiles sans bloquer le scroll */
+    touch-action: manipulation;
+}
+
+/* Fallback audio player */
+.audio-fallback {
+    display: none;
+}
+
+/* Quand p5.js n'est pas disponible, montrer le fallback */
+.no-p5 #p5-audio-container {
+    display: none;
+}
+
+.no-p5 .audio-fallback {
+    display: block;
+}
+
+.no-p5 #audio-player {
+    display: block;
+}
+}
+
+.no-p5 .audio-fallback {
+    display: block;
+}
+
+/* Instructions pour le player interactif */
+.audio-instructions {
+    text-align: center;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.05);
+    margin-top: 10px;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    line-height: 1.4;
+}
+
+.audio-instructions .instruction-item {
+    display: inline-block;
+    margin: 0 15px;
+    opacity: 0.8;
+}
+
+.audio-instructions .instruction-item::before {
+    content: "•";
+    margin-right: 5px;
+    color: var(--accent-color);
+}
+
+/* Responsive pour le player p5.js */
+@media (max-width: 768px) {
+    #p5-audio-container canvas {
+        max-width: 100%;
+        height: auto !important;
+    }
+}

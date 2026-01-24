@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes, maximum-scale=5.0">
+    <title>Spectacle d'Amour - Générez vos phrases</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- Chargement p5.js en ordre -->
+    <script src="p5.min.js"></script>
+    <script src="p5.sound.min.js"></script>
+    
+    <!-- Debug du chargement p5.sound -->
+    <script>
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                console.log('🔍 Debug p5.js:', typeof p5 !== 'undefined');
+                console.log('🔍 Debug p5.Amplitude:', typeof p5 !== 'undefined' && typeof p5.Amplitude !== 'undefined');
+                console.log('🔍 Debug p5.FFT:', typeof p5 !== 'undefined' && typeof p5.FFT !== 'undefined');
+            }, 100);
+        });
+    </script>
+</head>
+<body>
+    <div id="app">
+        <!-- Arrière-plan artistique P5.js -->
+        <div id="p5-container"></div>
+        
+        <!-- Interface principale -->
+        <header>
+            <h1>💕 Créez votre poème d'amour 💕</h1>
+            <p>Touchez les mots qui vous inspirent</p>
+        </header>
+        
+        <main>
+            <!-- Damier de mots -->
+            <section id="word-grid" class="word-grid">
+                <!-- Généré dynamiquement par JavaScript -->
+            </section>
+            
+            <!-- Mots sélectionnés -->
+            <section id="selected-words" class="selected-words">
+                <h3>Vos mots choisis :</h3>
+                <div id="selected-list"></div>
+                <button id="clear-selection" class="btn-secondary">Effacer</button>
+            </section>
+            
+            <!-- Contrôles -->
+            <section id="controls" class="controls">
+                <button id="generate-btn" class="btn-primary" disabled>
+                    🎭 Générer vos phrases
+                </button>
+                <button id="refresh-words" class="btn-secondary">
+                    🔄 Nouveaux mots
+                </button>
+            </section>
+            
+            <!-- Résultat -->
+            <section id="result" class="result hidden">
+                <h3>Votre création :</h3>
+                <div id="phrase-output"></div>
+                
+                <!-- Player audio interactif p5.js -->
+                <div id="p5-audio-container" class="p5-audio-player"></div>
+                
+                <!-- Player HTML5 de fallback -->
+                <div id="audio-player" class="audio-fallback"></div>
+                <button id="new-creation" class="btn-primary">
+                    ✨ Nouvelle création
+                </button>
+            </section>
+        </main>
+        
+        <!-- Loading spinner -->
+        <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <p>Création de votre poème en cours...</p>
+        </div>
+        
+        <!-- Status bar -->
+        <footer id="status">
+            <p>🔴 Spectacle en direct - Connexion active</p>
+        </footer>
+    </div>
+
+    <script src="p5-background.js"></script>
+    <script src="p5-audio-player.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>
