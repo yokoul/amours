@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Textes d'Amour - Player Audio v2</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style-v2.css">
+    <link rel="stylesheet" href="audio-player-simple.css">
+</head>
+<body>
+    <div id="app">
+        <header>
+            <h1>🎵 Textes d'Amour</h1>
+            <p>Player Audio Nouvelle Génération</p>
+        </header>
+
+        <main>
+            <!-- Générateur de phrases -->
+            <section class="generation-section">
+                <h2>Génération de Phrases</h2>
+                <div class="word-grid" id="word-grid">
+                    <div class="word-tile" data-word="amour">Amour</div>
+                    <div class="word-tile" data-word="passion">Passion</div>
+                    <div class="word-tile" data-word="tendresse">Tendresse</div>
+                    <div class="word-tile" data-word="désir">Désir</div>
+                    <div class="word-tile" data-word="romance">Romance</div>
+                    <div class="word-tile" data-word="cœur">Cœur</div>
+                    <div class="word-tile" data-word="âme">Âme</div>
+                    <div class="word-tile" data-word="baiser">Baiser</div>
+                    <div class="word-tile" data-word="éternité">Éternité</div>
+                    <div class="word-tile" data-word="rêve">Rêve</div>
+                    <div class="word-tile" data-word="folie">Folie</div>
+                    <div class="word-tile" data-word="beauté">Beauté</div>
+                    <div class="word-tile" data-word="sensualité">Sensualité</div>
+                    <div class="word-tile" data-word="plaisir">Plaisir</div>
+                    <div class="word-tile" data-word="extase">Extase</div>
+                    <div class="word-tile" data-word="émotion">Émotion</div>
+                </div>
+                
+                <div class="generation-controls">
+                    <div class="selected-words">
+                        <strong>Mots sélectionnés:</strong>
+                        <div id="selected-words-display"></div>
+                    </div>
+                    
+                    <div class="control-buttons">
+                        <button id="clear-selection" class="action-btn secondary">🗑️ Effacer</button>
+                        <button id="generate-phrase" class="action-btn primary">🎭 Générer (5 phrases)</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Layout principal avec player et visualisations -->
+            <div class="main-layout">
+                <!-- Colonne gauche: Player Audio -->
+                <div class="left-column">
+                    <div id="audio-player-container" class="audio-player-container">
+                        <!-- Le player sera injecté ici -->
+                    </div>
+                    
+                    <!-- Contrôles de visualisation -->
+                    <div class="visualizer-controls">
+                        <h4>🎨 Visualisation Audio</h4>
+                        <div class="viz-mode-buttons">
+                            <button class="viz-mode-btn active" data-mode="spectrum">Spectre</button>
+                            <button class="viz-mode-btn" data-mode="waveform">Forme d'onde</button>
+                            <button class="viz-mode-btn" data-mode="particles">Particules</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Colonne droite: Visualisations -->
+                <div class="right-column">
+                    <!-- Visualisation audio -->
+                    <div class="visualization-container">
+                        <canvas id="audio-visualizer" width="600" height="250"></canvas>
+                    </div>
+                    
+                    <!-- Spider sémantique -->
+                    <div class="spider-container">
+                        <canvas id="spider-semantic" width="300" height="300"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Status et informations -->
+            <div class="status-bar">
+                <div id="connection-status" class="status-item">
+                    <span class="status-indicator"></span>
+                    <span class="status-text">Connexion...</span>
+                </div>
+                <div id="generation-status" class="status-item">
+                    <span class="status-text">Prêt</span>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="audio-player-simple.js"></script>
+    <script src="spider-semantic.js"></script>
+    <script src="audio-visualizer.js"></script>
+    <script src="app-v2.js"></script>
+</body>
+</html>

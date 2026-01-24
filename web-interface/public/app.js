@@ -112,11 +112,6 @@ class SpectacleApp {
             navigator.vibrate(50);
         }
         
-        // Animation P5.js
-        if (window.onWordSelected) {
-            window.onWordSelected();
-        }
-        
         if (tile.classList.contains('selected')) {
             // Désélectionner
             tile.classList.remove('selected');
@@ -183,12 +178,7 @@ class SpectacleApp {
             const data = await response.json();
             
             if (data.success) {
-                this.displayResult(data);
-                
-                // Animation P5.js
-                if (window.onPhraseGenerated) {
-                    window.onPhraseGenerated();
-                }
+                await this.displayResult(data);
                 
                 // Vibration de succès
                 if (navigator.vibrate) {
@@ -206,10 +196,10 @@ class SpectacleApp {
         }
     }
     
-    displayResult(data) {
+    async displayResult(data) {
         const resultSection = document.getElementById('result');
         const phraseOutput = document.getElementById('phrase-output');
-        const audioPlayer = document.getElementById('audio-player');
+        // Plus besoin d'audioPlayer - utilisation de la nouvelle interface modulaire
         
         // Afficher les phrases générées
         if (data.phrases && data.phrases.length > 0) {
@@ -220,58 +210,13 @@ class SpectacleApp {
             phraseOutput.innerHTML = '<p>Phrases générées avec succès!</p>';
         }
         
-        // Utiliser le player p5.js si disponible, sinon fallback HTML5
+        // Utiliser la nouvelle interface audio modulaire
         if (data.audio_url) {
-            this.setupP5AudioPlayer(data.audio_url, data);
-            
-            // Instructions RÉELLES d'utilisation
-            const instructions = document.createElement('div');
-            instructions.className = 'audio-instructions';
-            instructions.innerHTML = `
-                <div class="instruction-item">▶️ PLAY/PAUSE - Touchez le gros bouton central</div>
-                <div class="instruction-item">⏮️⏭️ PRÉCÉDENT/SUIVANT - Boutons de navigation</div>
-                <div class="instruction-item">⏹️ STOP - Bouton d'arrêt complet</div>
-                <div class="instruction-item">📜 LIST - Afficher/cacher la playlist complète</div>
-                <div class="instruction-item">🎯 Touchez les tracks dans la liste pour les jouer</div>
-                <div class="instruction-item">📱 Interface tactile optimisée mobile</div>
-            `;
-            document.getElementById('p5-audio-container').appendChild(instructions);
-            
-            // Player de fallback (caché par défaut)
-            audioPlayer.innerHTML = `
-                <div class="audio-controls">
-                    <h4>🎧 Écouter votre création :</h4>
-                    <audio controls preload="auto" style="width: 100%; margin: 10px 0;">
-                        <source src="${data.audio_url}" type="audio/mpeg">
-                        <source src="${data.audio_url}" type="audio/wav">
-                        Votre navigateur ne supporte pas la lecture audio.
-                    </audio>
-                    <div class="audio-info">
-                        <small>⏱️ Durée: ${this.formatDuration(data.duration_seconds)} | 
-                        🎯 Mots: ${data.keywords ? data.keywords.join(', ') : 'N/A'}</small>
-                    </div>
-                </div>
-            `;
+            await this.setupP5AudioPlayer(data.audio_url, data);
         } else if (data.result && data.result.audio_url) {
-            this.setupP5AudioPlayer(data.result.audio_url, data.result);
-            
-            // Player de fallback
-            audioPlayer.innerHTML = `
-                <div class="audio-controls">
-                    <h4>🎧 Écouter votre création :</h4>
-                    <audio controls preload="auto" style="width: 100%; margin: 10px 0;">
-                        <source src="${data.result.audio_url}" type="audio/mpeg">
-                        <source src="${data.result.audio_url}" type="audio/wav">
-                        Votre navigateur ne supporte pas la lecture audio.
-                    </audio>
-                    <div class="audio-info">
-                        <small>⏱️ Durée: ${this.formatDuration(data.result.duration_seconds)} | 
-                        🎯 Mots: ${data.result.keywords ? data.result.keywords.join(', ') : 'N/A'}</small>
-                    </div>
-                </div>
-            `;
+            await this.setupP5AudioPlayer(data.result.audio_url, data.result);
         } else {
-            audioPlayer.innerHTML = '<p style="opacity: 0.7;">Audio non disponible</p>';
+            console.warn('⚠️ Aucun audio disponible dans la réponse');
         }
         
         resultSection.classList.remove('hidden');
@@ -280,64 +225,71 @@ class SpectacleApp {
         resultSection.scrollIntoView({ behavior: 'smooth' });
     }
     
-    setupP5AudioPlayer(audioUrl, metadata = {}) {
-        console.log('🎧 Configuration du player p5.js...');
+    async setupP5AudioPlayer(audioUrl, metadata = {}) {
+        console.log('🎧 Configuration du nouveau player modulaire...');
         
-        // Attendre que p5.js et p5.sound soient complètement chargés
-        const initP5Player = () => {
-            try {
-                // Vérifier que p5.js est bien chargé
-                if (typeof p5 === 'undefined') {
-                    console.error('❌ p5.js non chargé, fallback vers HTML5');
-                    document.body.classList.add('no-p5');
-                    return;
+        try {
+            // Utiliser la nouvelle interface audio modulaire
+            if (typeof initializeNewAudioInterface === 'function') {
+                
+                // Initialiser l'interface si pas déjà fait
+                if (!window.audioInterface) {
+                    window.audioInterface = await initializeNewAudioInterface();
                 }
                 
-                // p5.sound peut prendre du temps à s'initialiser
-                if (typeof p5.Amplitude === 'undefined' || typeof p5.FFT === 'undefined') {
-                    console.warn('⏳ p5.sound en cours de chargement, nouvelle tentative...');
-                    setTimeout(initP5Player, 500); // Réessayer dans 500ms
-                    return;
-                }
+                // Ajouter le track avec toutes les métadonnées
+                const trackId = window.audioInterface.addTrack(audioUrl, {
+                    phrases: metadata.phrases,
+                    keywords: this.selectedWords,
+                    duration_seconds: metadata.duration_seconds,
+                    timestamp: new Date().toLocaleTimeString(),
+                    love_analysis: metadata.love_analysis,
+                    title: metadata.title || this.extractPhraseTitle(metadata)
+                });
                 
-                console.log('✅ p5.js et p5.sound chargés correctement');
+                console.log(`✅ Track ajouté avec ID: ${trackId}`);
                 
-                // Initialiser le visualisateur p5.js s'il n'existe pas encore
-                if (typeof initAudioVisualizer === 'function' && !window.visualizer) {
-                    const success = initAudioVisualizer();
-                    if (!success) {
-                        console.error('❌ Échec initialisation visualisateur');
-                        document.body.classList.add('no-p5');
-                        return;
-                    }
-                }
-                
-                // Ajouter à la playlist p5.js avec métadonnées complètes
-                if (typeof addTrackToPlaylist === 'function') {
-                    console.log('✅ Ajout à la playlist p5.js');
-                    addTrackToPlaylist(audioUrl, {
-                        phrases: metadata.phrases,
-                        keywords: this.selectedWords,
-                        duration_seconds: metadata.duration_seconds,
-                        timestamp: new Date().toLocaleTimeString(),
-                        love_analysis: metadata.love_analysis
-                    });
-                } else {
-                    console.warn('addTrackToPlaylist non disponible, fallback vers loadAudioFile');
-                    // Fallback vers l'ancienne méthode
-                    if (typeof loadAudioFile === 'function') {
-                        loadAudioFile(audioUrl);
-                    }
-                }
-            } catch (error) {
-                console.error('❌ Erreur initialisation player p5.js:', error);
-                // Fallback vers le player HTML5
-                document.body.classList.add('no-p5');
+            } else {
+                console.warn('⚠️ Interface audio modulaire non disponible, fallback HTML5');
+                // Fallback vers player HTML5 simple
+                this.createFallbackPlayer(audioUrl, metadata);
             }
-        };
-        
-        // Démarrer l'initialisation
-        initP5Player();
+            
+        } catch (error) {
+            console.error('❌ Erreur configuration player:', error);
+            this.createFallbackPlayer(audioUrl, metadata);
+        }
+    }
+    
+    extractPhraseTitle(metadata) {
+        if (metadata.phrases && metadata.phrases.length > 0) {
+            return metadata.phrases[0].text.substring(0, 50) + '...';
+        }
+        return `Phrase ${this.selectedWords.join(', ')} - ${new Date().toLocaleTimeString()}`;
+    }
+    
+    createFallbackPlayer(audioUrl, metadata) {
+        // Player de fallback simple dans le container de l'interface modulaire
+        const audioInterfaceContainer = document.getElementById('audio-interface-container');
+        if (audioInterfaceContainer) {
+            audioInterfaceContainer.innerHTML = `
+                <div class="fallback-audio-player">
+                    <h4>🎧 Écouter votre création :</h4>
+                    <audio controls preload="auto" style="width: 100%; margin: 10px 0;">
+                        <source src="${audioUrl}" type="audio/mpeg">
+                        <source src="${audioUrl}" type="audio/wav">
+                        Votre navigateur ne supporte pas la lecture audio.
+                    </audio>
+                    <div class="audio-info">
+                        <p><strong>Mots-clés:</strong> ${this.selectedWords.join(', ')}</p>
+                        ${metadata.duration_seconds ? `<p><strong>Durée:</strong> ${this.formatDuration(metadata.duration_seconds)}</p>` : ''}
+                        <p><strong>Généré le:</strong> ${new Date().toLocaleTimeString()}</p>
+                    </div>
+                </div>
+            `;
+        } else {
+            console.warn('⚠️ Container audio-interface-container non trouvé');
+        }
     }
     
     formatPhrases(phrases) {
@@ -464,9 +416,7 @@ class SpectacleApp {
         
         // Gestion du redimensionnement
         window.addEventListener('resize', () => {
-            if (window.resizeCanvas) {
-                window.resizeCanvas();
-            }
+            // Redimensionnement géré par les composants modulaires
         });
     }
 }

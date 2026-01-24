@@ -457,9 +457,10 @@ footer {
 #p5-audio-container {
     position: relative;
     width: 100%;
-    max-width: 800px;
-    height: 600px;
-    margin: 20px auto;
+    max-width: none; /* Suppression de la largeur max */
+    height: 80vh; /* Hauteur responsive */
+    min-height: 500px;
+    margin: 20px 0; /* Suppression du centrage auto pour pleine largeur */
     display: flex;
     justify-content: center;
     border: 2px solid rgba(255, 255, 255, 0.2);
@@ -480,6 +481,18 @@ footer {
     cursor: pointer;
     /* Permettre les interactions tactiles sans bloquer le scroll */
     touch-action: manipulation;
+    
+    /* CORRECTION FLOU: Forcer le rendu net des textes */
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+    image-rendering: pixelated;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    
+    /* Forcer la taille exacte sans interpolation */
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
 }
 
 /* Fallback audio player */
@@ -505,33 +518,57 @@ footer {
     display: block;
 }
 
-/* Instructions pour le player interactif */
-.audio-instructions {
-    text-align: center;
-    padding: 15px;
-    background: rgba(255, 255, 255, 0.05);
-    margin-top: 10px;
-    border-radius: 10px;
-    font-size: 0.9rem;
-    line-height: 1.4;
-}
-
-.audio-instructions .instruction-item {
-    display: inline-block;
-    margin: 0 15px;
-    opacity: 0.8;
-}
-
-.audio-instructions .instruction-item::before {
-    content: "•";
-    margin-right: 5px;
-    color: var(--accent-color);
-}
-
 /* Responsive pour le player p5.js */
 @media (max-width: 768px) {
+    /* Optimisation mobile du container player */
+    #p5-audio-container {
+        height: 70vh; /* Utiliser la hauteur viewport au lieu d'une valeur fixe */
+        min-height: 400px; /* Hauteur minimum pour rester utilisable */
+        max-height: 600px; /* Hauteur maximum pour éviter débordement */
+        margin: 10px auto;
+        border-width: 1px; /* Bordures plus fines */
+    }
+    
     #p5-audio-container canvas {
-        max-width: 100%;
-        height: auto !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        height: 100% !important;
+        /* Assurer une taille correcte sur mobile */
+        min-height: 400px;
+    }
+    
+    /* Damier de mots plus grand sur mobile */
+    .word-tile {
+        min-height: 70px; /* Plus grand pour les touches */
+        font-size: 1rem;
+        padding: 20px 10px;
+    }
+    
+    /* Interface générale mobile */
+    #app {
+        padding: 10px;
+    }
+    
+    header h1 {
+        font-size: 1.5rem;
+    }
+}
+
+/* Optimisation pour très petits écrans (smartphones en portrait) */
+@media (max-width: 480px) {
+    #p5-audio-container {
+        height: 60vh;
+        min-height: 350px;
+        margin: 5px;
+    }
+    
+    .word-grid {
+        gap: 8px; /* Espacement réduit */
+    }
+    
+    .word-tile {
+        min-height: 65px;
+        font-size: 0.95rem;
+        padding: 18px 8px;
     }
 }

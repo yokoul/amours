@@ -219,11 +219,13 @@ function drawPulse() {
 
 // Fonction pour augmenter l'intensité lors d'interactions
 function increaseIntensity() {
-    currentIntensity = min(currentIntensity + 0.2, 1.0);
+    currentIntensity = Math.min(currentIntensity + 0.2, 1.0);
     
     // Ajouter des particules temporaires
     for (let i = 0; i < 10; i++) {
-        particles.push(new LoveParticle(mouseX || random(width), mouseY || random(height)));
+        const x = (typeof mouseX !== 'undefined' ? mouseX : Math.random() * (typeof width !== 'undefined' ? width : window.innerWidth));
+        const y = (typeof mouseY !== 'undefined' ? mouseY : Math.random() * (typeof height !== 'undefined' ? height : window.innerHeight));
+        particles.push(new LoveParticle(x, y));
     }
     
     // Limiter le nombre de particules
@@ -233,7 +235,7 @@ function increaseIntensity() {
     
     // Retour progressif à la normale
     setTimeout(() => {
-        currentIntensity = max(currentIntensity - 0.1, 0.3);
+        currentIntensity = Math.max(currentIntensity - 0.1, 0.3);
     }, 2000);
 }
 
@@ -247,7 +249,9 @@ function onPhraseGenerated() {
     
     // Explosion de particules
     for (let i = 0; i < 30; i++) {
-        particles.push(new LoveParticle(width/2 + random(-100, 100), height/2 + random(-100, 100)));
+        const w = (typeof width !== 'undefined' ? width : window.innerWidth);
+        const h = (typeof height !== 'undefined' ? height : window.innerHeight);
+        particles.push(new LoveParticle(w/2 + (Math.random() - 0.5) * 200, h/2 + (Math.random() - 0.5) * 200));
     }
     
     // Nouvelles ondes d'émotion

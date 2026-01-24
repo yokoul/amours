@@ -29,24 +29,36 @@ class AudioVisualizer {
     }
 
     setup() {
-        // Créer un canvas plus grand pour accommoder playlist et spider charts
-        console.log('🎨 Initialisation du canvas p5.js...');
+        // DIMENSIONS PLEINE LARGEUR RESPONSIVE
+        const container = document.getElementById('p5-audio-container');
+        let canvasWidth = window.innerWidth - 40; // Presque pleine largeur avec marges
+        let canvasHeight = window.innerHeight * 0.8; // 80% de la hauteur viewport
         
-        canvas = createCanvas(800, 600);
+        // Minima et maxima sensés
+        canvasWidth = Math.max(320, Math.min(canvasWidth, 2000));
+        canvasHeight = Math.max(400, Math.min(canvasHeight, 1200));
+        
+        console.log(`🎨 Canvas pleine largeur: ${canvasWidth}x${canvasHeight}`);
+        
+        canvas = createCanvas(canvasWidth, canvasHeight);
         canvas.parent('p5-audio-container');
         
-        // IMPORTANT: Permettre le scroll sur mobile
-        canvas.style('touch-action', 'manipulation');
-        canvas.style('pointer-events', 'auto');
+        // CORRECTION TEXTE NET selon p5.js docs
+        pixelDensity(displayDensity()); // Utiliser la densité native
+        
+        // Configuration typographie optimale p5.js
+        textAlign(LEFT, BASELINE);
+        textFont('system-ui, -apple-system, Arial, sans-serif'); // Police système optimale
+        
+        colorMode(HSB, 360, 100, 100, 100);
         
         // Initialiser l'analyse audio
         amplitude = new p5.Amplitude();
         fft = new p5.FFT(0.8, 1024);
         
-        colorMode(HSB, 360, 100, 100, 100);
-        
-        // Créer le système de particules initial
-        for (let i = 0; i < 50; i++) {
+        // Système de particules adaptatif
+        const numParticles = window.innerWidth <= 768 ? 20 : 40;
+        for (let i = 0; i < numParticles; i++) {
             particleSystem.push(new AudioParticle());
         }
         
@@ -124,7 +136,7 @@ class AudioVisualizer {
         const track = playlist[index];
         spiderData = track.spiderData;
         
-        this.loadAudio(track.audioUrl);
+        this.loadAudio(track.audioUrl, track);
         console.log('🎧 Lecture:', track.title);
     }
 
@@ -140,7 +152,7 @@ class AudioVisualizer {
         this.playTrack(prevIndex);
     }
 
-    loadAudio(audioUrl) {
+    loadAudio(audioUrl, metadata = {}) {
         if (currentAudioUrl === audioUrl) return;
         
         if (audioPlayer) {
@@ -151,6 +163,19 @@ class AudioVisualizer {
         currentAudioUrl = audioUrl;
         console.log('🎵 Chargement audio p5.js:', audioUrl);
         
+        // IMPORTANT: Activer l'AudioContext sur mobile au premier clic
+        if (getAudioContext && getAudioContext().state === 'suspended') {
+            console.log('📱 Activation AudioContext pour mobile...');
+            getAudioContext().resume().then(() => {
+                console.log('✅ AudioContext activé');
+                this.actuallyLoadSound(audioUrl, metadata);
+            });
+        } else {
+            this.actuallyLoadSound(audioUrl, metadata);
+        }
+    }
+    
+    actuallyLoadSound(audioUrl, metadata = {}) {
         // Utiliser l'API p5.js correcte pour charger l'audio
         audioPlayer = loadSound(audioUrl, 
             // Callback de succès
@@ -177,7 +202,8 @@ class AudioVisualizer {
     draw() {
         background(0, 0, 5, 95); // Fond très sombre
         
-        if (!audioPlayer) {
+        // Toujours afficher quelque chose, même sans audio
+        if (!audioPlayer && playlist.length === 0) {
             this.drawPlaceholder();
             return;
         }
@@ -186,31 +212,415 @@ class AudioVisualizer {
         this.updatePlaybackStatus();
         
         // Layout : playlist à gauche, visualisation au centre, spider à droite
-        this.drawLayout();
+        try {
+            this.drawLayout();
+        } catch (error) {
+            console.error('❌ Erreur dans drawLayout:', error);
+            this.drawPlaceholder(); // Fallback
+        }
     }
 
     drawLayout() {
         let level = amplitude.getLevel();
         bgHue = (bgHue + level * 30) % 360;
         
-        // Zone playlist (gauche)
-        if (showPlaylist && playlist.length > 0) {
-            this.drawPlaylist();
+        // LAYOUT UNIFIÉ EN 3 ZONES VERTICALES
+        
+        // Zone 1: Contrôles (20%)
+        this.drawControlsSection(height * 0.2);
+        
+        // Zone 2: Visualisation principale (60%) 
+        this.drawVisualizationSection(height * 0.2, height * 0.6, level);
+        
+        // Zone 3: Playlist + Spider (20%)
+        if (playlist.length > 0) {
+            this.drawPlaylistSection(height * 0.8, height * 0.2);
+        }
+    }
+    
+    // === MÉTHODES LAYOUT UNIFIÉES ===
+    
+    drawControlsSection(sectionHeight) {
+        // Section contrôles: 0 à sectionHeight
+        fill(0, 0, 15, 90);
+        stroke(bgHue, 50, 70);
+        strokeWeight(1);
+        rect(0, 0, width, sectionHeight);
+        
+        // Info du track actuel
+        if (currentTrackIndex >= 0 && playlist[currentTrackIndex]) {
+            let track = playlist[currentTrackIndex];
+            fill(bgHue, 80, 100);
+            textAlign(LEFT, TOP);
+            textSize(16); // Taille nette selon docs p5.js
+            text(`🎵 ${track.title.substring(0, 45)}`, 15, 15);
+            
+            fill(0, 0, 70);
+            textSize(12);
+            text(`${track.keywords.slice(0, 4).join(' • ')}`, 15, 40);
         }
         
-        // Zone visualisation centrale
+        // Boutons centrés
+        let buttonY = sectionHeight / 2 + 15;
+        let centerX = width / 2;
+        let spacing = Math.min(80, width / 10);
+        let buttonSize = Math.min(45, width / 20);
+        
+        // Boutons avec style p5.js optimisé
+        this.drawControlButton(centerX - spacing, buttonY, buttonSize, "⏮", "prev");
+        this.drawControlButton(centerX, buttonY, buttonSize + 10, isPlaying ? "⏸" : "▶", "play");
+        this.drawControlButton(centerX + spacing, buttonY, buttonSize, "⏭", "next");
+        
+        // Sélecteur de mode visuel
+        this.drawVisualModeSelector(sectionHeight - 50);
+    }
+    
+    drawControlButton(x, y, size, label, action) {
+        let isHover = dist(mouseX, mouseY, x, y) < size/2 + 10;
+        let isPlayingBtn = action === "play" && isPlaying;
+        
+        // Style selon l'état
+        if (isPlayingBtn) {
+            fill(bgHue, 50, 80);
+            stroke(bgHue, 70, 100);
+        } else if (isHover) {
+            fill(bgHue, 30, 60);
+            stroke(bgHue, 60, 90);
+        } else {
+            fill(0, 0, 40);
+            stroke(bgHue, 40, 70);
+        }
+        
+        strokeWeight(2);
+        ellipse(x, y, size);
+        
+        // Label centré
+        fill(255);
+        textAlign(CENTER, CENTER);
+        textSize(size * 0.4);
+        text(label, x, y);
+        
+        // Stocker zone tactile
+        if (!this.controlZones) this.controlZones = {};
+        this.controlZones[action] = { x: x, y: y, size: size + 20 };
+    }
+    
+    drawVisualModeSelector(yPos) {
+        // Sélecteur de mode visuel
+        let modes = ['spectrum', 'particles', 'waves', 'spider'];
+        let modeWidth = (width - 40) / modes.length;
+        
+        fill(bgHue, 60, 90);
+        textAlign(LEFT, CENTER);
+        textSize(10);
+        text("Mode visuel:", 15, yPos - 10);
+        
+        for (let i = 0; i < modes.length; i++) {
+            let mode = modes[i];
+            let x = 15 + i * modeWidth;
+            let isActive = visualMode === mode;
+            
+            if (isActive) {
+                fill(bgHue, 60, 90);
+                stroke(bgHue, 80, 100);
+            } else {
+                fill(0, 0, 30);
+                stroke(0, 0, 50);
+            }
+            
+            strokeWeight(1);
+            rect(x, yPos, modeWidth - 5, 20, 5);
+            
+            fill(isActive ? 255 : [0, 0, 70]);
+            textAlign(CENTER, CENTER);
+            textSize(9);
+            text(mode.toUpperCase(), x + modeWidth/2 - 2.5, yPos + 10);
+            
+            // Zone tactile
+            if (!this.visualModeZones) this.visualModeZones = {};
+            this.visualModeZones[mode] = { x: x, y: yPos, width: modeWidth - 5, height: 20 };
+        }
+    }
+    
+    drawVisualizationSection(startY, sectionHeight, level) {
+        // Section visualisation: startY à startY + sectionHeight
         push();
-        translate(showPlaylist ? width * 0.4 : width * 0.3, height * 0.5);
-        this.drawMainVisualization(level);
-        pop();
+        translate(0, startY);
         
-        // Zone spider chart (droite)
-        if (spiderData && (visualMode === 'spider' || showPlaylist)) {
-            this.drawSpiderChart();
+        // Fond de la section
+        fill(0, 0, 8, 70);
+        stroke(bgHue, 20, 40);
+        strokeWeight(1);
+        rect(0, 0, width, sectionHeight);
+        
+        // Titre de la visualisation
+        fill(bgHue, 70, 90);
+        textAlign(CENTER, TOP);
+        textSize(14);
+        text(`🎵 ${visualMode.toUpperCase()} - ANALYSE TEMPS RÉEL`, width/2, 10);
+        
+        // Dessiner selon le mode sélectionné
+        switch(visualMode) {
+            case 'spectrum':
+                this.drawSpectrumVisualization(30, sectionHeight - 60, level);
+                break;
+            case 'particles':
+                this.drawParticleVisualization(30, sectionHeight - 60, level);
+                break;
+            case 'waves':
+                this.drawWaveVisualization(30, sectionHeight - 60, level);
+                break;
+            case 'spider':
+                this.drawSpiderVisualization(30, sectionHeight - 60, level);
+                break;
         }
         
-        // Interface de contrôle en bas
-        this.drawControlBar();
+        pop();
+    }
+    
+    drawPlaylistSection(startY, sectionHeight) {
+        // Section playlist: startY à startY + sectionHeight
+        push();
+        translate(0, startY);
+        
+        // Fond playlist
+        fill(0, 0, 12, 85);
+        stroke(bgHue, 30, 50);
+        strokeWeight(1);
+        rect(0, 0, width, sectionHeight);
+        
+        // Header playlist
+        fill(bgHue, 60, 90);
+        textAlign(LEFT, TOP);
+        textSize(12);
+        text(`🎵 PLAYLIST (${playlist.length} tracks)`, 15, 10);
+        
+        // Tracks compacts horizontaux
+        this.drawCompactPlaylist(30, sectionHeight - 40);
+        
+        pop();
+    }
+    
+    drawCompactPlaylist(startY, availableHeight) {
+        let trackWidth = Math.min(180, (width - 30) / Math.max(1, Math.min(playlist.length, 4)));
+        let trackHeight = availableHeight - 10;
+        
+        for (let i = 0; i < Math.min(playlist.length, Math.floor(width / trackWidth)); i++) {
+            let track = playlist[i];
+            let x = 15 + i * (trackWidth + 10);
+            
+            // Style selon l'état
+            if (i === currentTrackIndex) {
+                fill(bgHue, 40, 30, 90);
+                stroke(bgHue, 70, 90);
+                strokeWeight(2);
+            } else {
+                fill(0, 0, 25, 80);
+                stroke(0, 0, 45);
+                strokeWeight(1);
+            }
+            
+            rect(x, startY, trackWidth, trackHeight, 5);
+            
+            // Contenu track
+            fill(i === currentTrackIndex ? [bgHue, 90, 100] : [0, 0, 90]);
+            textAlign(LEFT, TOP);
+            textSize(10);
+            text(`${i + 1}. ${track.title.substring(0, 22)}`, x + 8, startY + 8);
+            
+            fill(0, 0, 70);
+            textSize(8);
+            text(`⏱️ ${this.formatTime(track.duration)}`, x + 8, startY + trackHeight - 15);
+            
+            // Zone tactile playlist (ajuster pour la position globale)
+            if (!this.playlistZones) this.playlistZones = [];
+            this.playlistZones[i] = { 
+                x: x, 
+                y: height * 0.8 + startY, // Position absolue pour le clic
+                width: trackWidth, 
+                height: trackHeight, 
+                index: i 
+            };
+        }
+    }
+    
+    drawCompactControlsTop() {
+        // Zone contrôles: 0 à 20% de la hauteur
+        let controlHeight = height * 0.2;
+        
+        // Fond contrôles
+        fill(0, 0, 15, 90);
+        stroke(bgHue, 50, 70);
+        strokeWeight(1);
+        rect(0, 0, width, controlHeight);
+        
+        // Info du track actuel
+        if (currentTrackIndex >= 0 && playlist[currentTrackIndex]) {
+            let track = playlist[currentTrackIndex];
+            fill(bgHue, 80, 100);
+            textAlign(LEFT, TOP);
+            textSize(Math.floor(Math.max(10, width / 40))); // Taille ENTIÈRE
+            text(`🎵 ${track.title.substring(0, 35)}`, 10, 10);
+            
+            fill(0, 0, 70);
+            textSize(Math.floor(Math.max(8, width / 50))); // Taille ENTIÈRE
+            text(`${track.keywords.slice(0, 3).join(' • ')}`, 10, 30);
+        }
+        
+        // Boutons centrés
+        let buttonY = controlHeight / 2 + 10;
+        let centerX = width / 2;
+        let spacing = Math.min(60, width / 8);
+        let buttonSize = Math.min(35, width / 15);
+        
+        // Style boutons
+        let normalColor = [0, 0, 40];
+        let hoverColor = [bgHue, 30, 60];
+        
+        // Bouton PRÉCÉDENT
+        let prevX = centerX - spacing;
+        let isPrevHover = dist(mouseX, mouseY, prevX, buttonY) < buttonSize;
+        
+        fill(...(isPrevHover ? hoverColor : normalColor));
+        stroke(bgHue, 40, 70);
+        strokeWeight(2);
+        ellipse(prevX, buttonY, buttonSize);
+        fill(255);
+        textAlign(CENTER, CENTER);
+        textSize(buttonSize * 0.4);
+        text("⏮", prevX, buttonY);
+        
+        // Bouton PLAY/PAUSE
+        let playSize = buttonSize + 8;
+        let isPlayHover = dist(mouseX, mouseY, centerX, buttonY) < playSize;
+        
+        fill(...(isPlaying ? [bgHue, 50, 80] : (isPlayHover ? hoverColor : normalColor)));
+        stroke(bgHue, 60, 90);
+        strokeWeight(2);
+        ellipse(centerX, buttonY, playSize);
+        fill(255);
+        textSize(playSize * 0.4);
+        text(isPlaying ? "⏸" : "▶", centerX, buttonY);
+        
+        // Bouton SUIVANT
+        let nextX = centerX + spacing;
+        let isNextHover = dist(mouseX, mouseY, nextX, buttonY) < buttonSize;
+        
+        fill(...(isNextHover ? hoverColor : normalColor));
+        stroke(bgHue, 40, 70);
+        strokeWeight(2);
+        ellipse(nextX, buttonY, buttonSize);
+        fill(255);
+        textSize(buttonSize * 0.4);
+        text("⏭", nextX, buttonY);
+        
+        // Stocker les zones tactiles
+        this.controlZones = {
+            prev: { x: prevX, y: buttonY, size: buttonSize + 10 },
+            play: { x: centerX, y: buttonY, size: playSize + 10 },
+            next: { x: nextX, y: buttonY, size: buttonSize + 10 }
+        };
+    }
+    
+    drawMainSpectrum(level) {
+        // Zone spectrum: 20% à 80% de la hauteur
+        let spectrumY = height * 0.2;
+        let spectrumHeight = height * 0.6;
+        
+        push();
+        translate(width / 2, spectrumY + spectrumHeight / 2);
+        
+        // Fond spectrum
+        fill(0, 0, 5, 60);
+        stroke(bgHue, 20, 40);
+        strokeWeight(1);
+        rectMode(CENTER);
+        rect(0, 0, width - 20, spectrumHeight - 20, 15);
+        
+        // SPECTRUM FREQUENCY
+        let spectrum = fft.analyze();
+        let spectrumWidth = width - 60;
+        let barWidth = spectrumWidth / (spectrum.length / 4);
+        
+        // Dessiner les barres du spectrum
+        for (let i = 0; i < spectrum.length / 4; i++) {
+            let amplitude = spectrum[i];
+            let barHeight = map(amplitude, 0, 255, 5, spectrumHeight - 60);
+            
+            // Couleurs basées sur la fréquence et l'amplitude
+            let hue = map(i, 0, spectrum.length / 4, bgHue - 40, bgHue + 40);
+            let saturation = map(amplitude, 0, 255, 20, 80);
+            let brightness = map(amplitude, 0, 255, 30, 90);
+            
+            fill(hue, saturation, brightness, 80);
+            noStroke();
+            
+            let x = map(i, 0, spectrum.length / 4, -spectrumWidth/2, spectrumWidth/2);
+            rect(x, 0, barWidth - 1, -barHeight);
+            
+            // Effet de reflet
+            fill(hue, saturation, brightness, 30);
+            rect(x, 0, barWidth - 1, barHeight / 4);
+        }
+        
+        // Titre
+        fill(bgHue, 70, 90, 70);
+        textAlign(CENTER, CENTER);
+        textSize(Math.floor(Math.max(12, width / 30))); // Taille ENTIÈRE
+        text("🎵 ANALYSE SPECTRALE EN TEMPS RÉEL", 0, -spectrumHeight/2 + 30);
+        
+        pop();
+    }
+    
+    drawBottomPlaylist() {
+        // Zone playlist: 80% à 100% de la hauteur
+        let playlistY = height * 0.8;
+        let playlistHeight = height * 0.2;
+        
+        // Fond playlist
+        fill(0, 0, 10, 85);
+        stroke(bgHue, 30, 50);
+        strokeWeight(1);
+        rect(0, playlistY, width, playlistHeight);
+        
+        // Header playlist
+        fill(bgHue, 60, 90);
+        textAlign(LEFT, TOP);
+        textSize(Math.floor(Math.max(10, width / 40))); // Taille ENTIÈRE
+        text(`🎵 PLAYLIST (${playlist.length})`, 10, playlistY + 5);
+        
+        // Tracks horizontaux compacts
+        let trackWidth = Math.min(150, width / 4);
+        let trackY = playlistY + 25;
+        let trackHeight = playlistHeight - 30;
+        
+        for (let i = 0; i < Math.min(playlist.length, Math.floor(width / trackWidth)); i++) {
+            let track = playlist[i];
+            let trackX = 10 + i * (trackWidth + 10);
+            
+            // Background track
+            if (i === currentTrackIndex) {
+                fill(bgHue, 40, 30, 90);
+                stroke(bgHue, 70, 90);
+                strokeWeight(2);
+            } else {
+                fill(0, 0, 20, 80);
+                stroke(0, 0, 40);
+                strokeWeight(1);
+            }
+            
+            rect(trackX, trackY, trackWidth, trackHeight, 5);
+            
+            // Contenu track
+            fill(i === currentTrackIndex ? [bgHue, 90, 100] : [0, 0, 90]);
+            textAlign(LEFT, TOP);
+            textSize(Math.floor(Math.max(8, width / 60))); // Taille ENTIÈRE
+            text(`${i + 1}. ${track.title.substring(0, 20)}`, trackX + 5, trackY + 5);
+            
+            fill(0, 0, 70);
+            textSize(Math.floor(Math.max(7, width / 70))); // Taille ENTIÈRE
+            text(`⏱️ ${this.formatTime(track.duration)}`, trackX + 5, trackY + trackHeight - 15);
+        }
     }
 
     drawPlaylist() {
@@ -341,6 +751,141 @@ class AudioVisualizer {
             play: { x: playButtonX, y: buttonY, size: buttonSize },
             delete: { x: deleteButtonX, y: buttonY, size: buttonSize }
         };
+    }
+    
+    drawCenterSpectrum(level) {
+        // SPECTRUM EN GRAND AU CENTRE
+        let centerY = height * 0.35 + 20;
+        let centerHeight = height * 0.45;
+        
+        // Zone spectrum
+        push();
+        translate(width / 2, centerY + centerHeight / 2);
+        
+        // Fond spectrum
+        fill(0, 0, 5, 60);
+        stroke(bgHue, 20, 40);
+        rectMode(CENTER);
+        rect(0, 0, width - 40, centerHeight - 40, 15);
+        
+        // SPECTRUM FREQUENCY GRAND ET BEAU
+        let spectrum = fft.analyze();
+        let spectrumWidth = width - 80;
+        let spectrumHeight = centerHeight - 80;
+        
+        // Dessiner le spectrum avec des barres
+        let barWidth = spectrumWidth / spectrum.length * 4; // Plus de barres visibles
+        
+        for (let i = 0; i < spectrum.length / 4; i++) {
+            let amplitude = spectrum[i];
+            let barHeight = map(amplitude, 0, 255, 5, spectrumHeight);
+            
+            // Couleur basée sur la fréquence
+            let hue = map(i, 0, spectrum.length / 4, bgHue - 60, bgHue + 60);
+            let saturation = map(amplitude, 0, 255, 30, 90);
+            let brightness = map(amplitude, 0, 255, 40, 100);
+            
+            fill(hue, saturation, brightness, 80);
+            stroke(hue, saturation + 20, brightness + 20);
+            strokeWeight(0.5);
+            
+            let x = map(i, 0, spectrum.length / 4, -spectrumWidth/2, spectrumWidth/2);
+            rect(x, 0, barWidth - 1, -barHeight);
+            
+            // Reflet en bas
+            fill(hue, saturation, brightness, 30);
+            rect(x, 0, barWidth - 1, barHeight / 3);
+        }
+        
+        // Texte informatif
+        fill(bgHue, 70, 90, 70);
+        textAlign(CENTER, CENTER);
+        textSize(width < 500 ? 12 : 16);
+        text("🎵 ANALYSE SPECTRALE", 0, -centerHeight/2 + 25);
+        
+        pop();
+    }
+    
+    drawBottomSpider() {
+        // SPIDER CHART EN BAS
+        let spiderY = height * 0.82;
+        let spiderHeight = height * 0.18 - 10;
+        let spiderSize = Math.min(spiderHeight - 20, 100);
+        
+        push();
+        translate(width / 2, spiderY + spiderHeight / 2);
+        
+        // Fond spider
+        fill(0, 0, 8, 70);
+        stroke(bgHue, 25, 45);
+        rectMode(CENTER);
+        rect(0, 0, width - 20, spiderHeight, 10);
+        
+        // Spider chart compact
+        this.drawCompactSpider(spiderSize);
+        
+        pop();
+    }
+    
+    drawCompactSpider(size) {
+        const categories = Object.keys(spiderData);
+        const numCategories = categories.length;
+        const angleStep = TWO_PI / numCategories;
+        
+        // Grille spider
+        stroke(bgHue, 20, 60, 40);
+        strokeWeight(0.5);
+        noFill();
+        
+        // Cercles concentriques
+        for (let r = size/4; r <= size/2; r += size/4) {
+            ellipse(0, 0, r * 2);
+        }
+        
+        // Lignes radiales
+        for (let i = 0; i < numCategories; i++) {
+            let angle = i * angleStep - PI/2;
+            let x = cos(angle) * size/2;
+            let y = sin(angle) * size/2;
+            line(0, 0, x, y);
+        }
+        
+        // Données spider
+        fill(bgHue, 60, 80, 60);
+        stroke(bgHue, 80, 100);
+        strokeWeight(2);
+        
+        beginShape();
+        for (let i = 0; i < numCategories; i++) {
+            let category = categories[i];
+            let value = spiderData[category];
+            let angle = i * angleStep - PI/2;
+            let radius = value * size/2;
+            
+            let x = cos(angle) * radius;
+            let y = sin(angle) * radius;
+            
+            if (i === 0) {
+                vertex(x, y);
+            } else {
+                vertex(x, y);
+            }
+        }
+        endShape(CLOSE);
+        
+        // Labels (seulement les 4 principaux sur petit écran)
+        fill(0, 0, 90, 80);
+        textAlign(CENTER, CENTER);
+        textSize(8);
+        
+        for (let i = 0; i < Math.min(numCategories, 4); i++) {
+            let category = categories[i];
+            let angle = i * angleStep - PI/2;
+            let x = cos(angle) * (size/2 + 15);
+            let y = sin(angle) * (size/2 + 15);
+            
+            text(category.substring(0, 6), x, y);
+        }
     }
 
     drawScrollIndicator(playlistWidth, playlistHeight) {
@@ -739,6 +1284,19 @@ class AudioVisualizer {
         let secs = floor(seconds % 60);
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     }
+    
+    // === MÉTHODES D'AIDE POUR LES ZONES TACTILES ===
+    
+    isInZone(x, y, zone) {
+        if (!zone) return false;
+        return dist(x, y, zone.x, zone.y) < zone.size / 2;
+    }
+    
+    isInRectZone(x, y, zone) {
+        if (!zone) return false;
+        return x >= zone.x && x <= zone.x + zone.width &&
+               y >= zone.y && y <= zone.y + zone.height;
+    }
 
     handleMousePressed() {
         // Gestion TACTILE pour mobile et desktop
@@ -746,7 +1304,57 @@ class AudioVisualizer {
     }
     
     handleTouchStart(x, y) {
-        // Contrôles principaux (play, pause, next, prev, stop)
+        console.log(`👆 Touch/Click: ${x}, ${y}`);
+        
+        // Gestion des modes visuels
+        if (this.visualModeZones) {
+            for (let mode in this.visualModeZones) {
+                let zone = this.visualModeZones[mode];
+                if (this.isInRectZone(x, y, zone)) {
+                    visualMode = mode;
+                    console.log(`🎨 Mode visuel: ${mode}`);
+                    return;
+                }
+            }
+        }
+        
+        // NOUVEAU: Contrôles compacts en haut
+        if (this.controlZones) {
+            // Bouton PLAY/PAUSE compact
+            if (this.isInZone(x, y, this.controlZones.play)) {
+                this.togglePlay();
+                this.addTouchFeedback(this.controlZones.play.x, this.controlZones.play.y);
+                return;
+            }
+            
+            // Bouton PRÉCÉDENT compact
+            if (this.isInZone(x, y, this.controlZones.prev)) {
+                this.prevTrack();
+                this.addTouchFeedback(this.controlZones.prev.x, this.controlZones.prev.y);
+                return;
+            }
+            
+            // Bouton SUIVANT compact
+            if (this.isInZone(x, y, this.controlZones.next)) {
+                this.nextTrack();
+                this.addTouchFeedback(this.controlZones.next.x, this.controlZones.next.y);
+                return;
+            }
+        }
+        
+        // Gestion de la playlist
+        if (this.playlistZones) {
+            for (let i = 0; i < this.playlistZones.length; i++) {
+                let zone = this.playlistZones[i];
+                if (zone && this.isInRectZone(x, y, zone)) {
+                    this.playTrack(zone.index);
+                    console.log(`🎵 Lecture track: ${zone.index}`);
+                    return;
+                }
+            }
+        }
+        
+        // Contrôles principaux (ancienne version - fallback)
         if (this.touchZones) {
             // Bouton PLAY/PAUSE
             if (this.isPointInZone(x, y, this.touchZones.play)) {
@@ -927,6 +1535,19 @@ class AudioVisualizer {
     togglePlay() {
         if (!audioPlayer || !isLoaded) return;
         
+        // IMPORTANT: S'assurer que l'AudioContext est activé sur mobile
+        if (getAudioContext && getAudioContext().state === 'suspended') {
+            console.log('📱 Activation AudioContext au clic...');
+            getAudioContext().resume().then(() => {
+                console.log('✅ AudioContext activé, lecture...');
+                this.actualPlay();
+            });
+        } else {
+            this.actualPlay();
+        }
+    }
+    
+    actualPlay() {
         if (isPlaying) {
             audioPlayer.pause();
             isPlaying = false;
@@ -1014,6 +1635,202 @@ class AudioParticle {
         fill(this.hue, 50, 70, alpha * 0.3);
         ellipse(this.x - this.vx * 3, this.y - this.vy * 3, this.size * 0.6);
     }
+    
+    // === MÉTHODES DE VISUALISATION RESTAURÉES ===
+    
+    drawSpectrumVisualization(startY, height, level) {
+        // Analyse spectrale avec FFT
+        let spectrum = fft.analyze();
+        let barWidth = (width - 60) / (spectrum.length / 8); // Moins de barres pour plus de clarté
+        
+        push();
+        translate(30, startY + height/2);
+        
+        // Dessiner les barres du spectrum
+        for (let i = 0; i < spectrum.length / 8; i++) {
+            let amp = spectrum[i];
+            let barHeight = map(amp, 0, 255, 5, height/2 - 20);
+            
+            // Couleurs arc-en-ciel basées sur la fréquence
+            let hue = map(i, 0, spectrum.length / 8, bgHue - 60, bgHue + 60);
+            let saturation = map(amp, 0, 255, 40, 90);
+            let brightness = map(amp, 0, 255, 50, 95);
+            
+            fill(hue, saturation, brightness, 85);
+            noStroke();
+            
+            let x = i * barWidth;
+            rect(x, 0, barWidth - 2, -barHeight); // Barre vers le haut
+            
+            // Effet miroir vers le bas
+            fill(hue, saturation, brightness, 40);
+            rect(x, 0, barWidth - 2, barHeight / 3);
+        }
+        
+        pop();
+    }
+    
+    drawParticleVisualization(startY, height, level) {
+        // Animation de particules audio-réactives
+        let spectrum = fft.analyze();
+        
+        // Mettre à jour les particules existantes
+        for (let i = 0; i < particleSystem.length; i++) {
+            let particle = particleSystem[i];
+            
+            // Influence de l'audio sur la particule
+            let spectrumIndex = Math.floor(map(i, 0, particleSystem.length, 0, spectrum.length));
+            let audioInfluence = map(spectrum[spectrumIndex], 0, 255, 0.5, 3);
+            
+            particle.update(level * audioInfluence);
+            particle.display(startY + height/2, height);
+        }
+        
+        // Ajouter des particules si forte amplitude
+        if (level > 0.7 && particleSystem.length < 80) {
+            particleSystem.push(new AudioParticle());
+        }
+        
+        // Info visualisation
+        fill(bgHue, 60, 80);
+        textAlign(CENTER, TOP);
+        textSize(12);
+        text(`${particleSystem.length} particules • Niveau: ${(level * 100).toFixed(0)}%`, 
+             width/2, startY + 10);
+    }
+    
+    drawWaveVisualization(startY, height, level) {
+        // Forme d'onde basée sur l'amplitude
+        let waveform = fft.waveform();
+        
+        push();
+        translate(30, startY + height/2);
+        
+        // Configuration d'onde
+        stroke(bgHue, 80, 90);
+        strokeWeight(3);
+        noFill();
+        
+        // Dessiner l'onde
+        beginShape();
+        for (let i = 0; i < waveform.length; i += 4) { // Échantillonner moins pour performance
+            let x = map(i, 0, waveform.length, 0, width - 60);
+            let y = map(waveform[i], -1, 1, -height/3, height/3);
+            vertex(x, y);
+        }
+        endShape();
+        
+        // Onde secondaire avec phase décalée
+        stroke(bgHue, 60, 70, 60);
+        strokeWeight(2);
+        beginShape();
+        for (let i = 0; i < waveform.length; i += 6) {
+            let x = map(i, 0, waveform.length, 0, width - 60);
+            let y = map(waveform[i], -1, 1, -height/4, height/4) + sin(millis() * 0.01 + i * 0.1) * 10;
+            vertex(x, y);
+        }
+        endShape();
+        
+        pop();
+        
+        // Indicateurs
+        fill(bgHue, 70, 85);
+        textAlign(LEFT, TOP);
+        textSize(10);
+        text(`Forme d'onde • ${waveform.length} échantillons`, 40, startY + height - 20);
+    }
+    
+    drawSpiderVisualization(startY, height, level) {
+        // Graphique radar/spider des émotions
+        if (!spiderData) {
+            // Données par défaut si pas de spider data
+            spiderData = {
+                'Passion': Math.random() * 0.6 + 0.4,
+                'Tendresse': Math.random() * 0.5 + 0.3,
+                'Désir': Math.random() * 0.7 + 0.3,
+                'Romance': Math.random() * 0.8 + 0.2,
+                'Mélancolie': Math.random() * 0.4 + 0.2,
+                'Espoir': Math.random() * 0.6 + 0.4,
+                'Sensualité': Math.random() * 0.5 + 0.3,
+                'Poésie': Math.random() * 0.9 + 0.1
+            };
+        }
+        
+        push();
+        translate(width/2, startY + height/2);
+        
+        let categories = Object.keys(spiderData);
+        let angleStep = TWO_PI / categories.length;
+        let maxRadius = Math.min(height, width) / 4;
+        
+        // Grille de fond (cercles concentriques)
+        stroke(bgHue, 20, 60, 30);
+        strokeWeight(1);
+        noFill();
+        for (let r = maxRadius / 4; r <= maxRadius; r += maxRadius / 4) {
+            ellipse(0, 0, r * 2);
+        }
+        
+        // Lignes radiales
+        for (let i = 0; i < categories.length; i++) {
+            let angle = i * angleStep - PI/2;
+            let x = cos(angle) * maxRadius;
+            let y = sin(angle) * maxRadius;
+            line(0, 0, x, y);
+        }
+        
+        // Tracé des données avec effet audio
+        let audioBoost = 1 + level * 0.5; // Boost audio-réactif
+        
+        fill(bgHue, 70, 80, 40);
+        stroke(bgHue, 90, 100);
+        strokeWeight(2);
+        
+        beginShape();
+        for (let i = 0; i < categories.length; i++) {
+            let angle = i * angleStep - PI/2;
+            let value = spiderData[categories[i]] * audioBoost;
+            let radius = value * maxRadius;
+            
+            let x = cos(angle) * radius;
+            let y = sin(angle) * radius;
+            vertex(x, y);
+        }
+        endShape(CLOSE);
+        
+        // Points et labels
+        for (let i = 0; i < categories.length; i++) {
+            let angle = i * angleStep - PI/2;
+            let value = spiderData[categories[i]] * audioBoost;
+            let radius = value * maxRadius;
+            
+            let x = cos(angle) * radius;
+            let y = sin(angle) * radius;
+            
+            // Point de donnée
+            fill(bgHue, 100, 100);
+            noStroke();
+            ellipse(x, y, 6);
+            
+            // Label de catégorie
+            let labelX = cos(angle) * (maxRadius + 20);
+            let labelY = sin(angle) * (maxRadius + 20);
+            
+            fill(bgHue, 80, 90);
+            textAlign(CENTER, CENTER);
+            textSize(10);
+            text(categories[i], labelX, labelY);
+        }
+        
+        pop();
+        
+        // Titre et info
+        fill(bgHue, 70, 100);
+        textAlign(CENTER, TOP);
+        textSize(12);
+        text("ANALYSE SÉMANTIQUE ÉMOTIONNELLE", width/2, startY + 5);
+    }
+}
 }
 
 // Instance globale
