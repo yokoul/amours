@@ -42,6 +42,7 @@ class PhraseMatch:
     keywords_found: List[str]
     match_score: float
     love_type: Optional[str] = None  # Type d'amour dominant
+    love_analysis: Optional[Dict[str, float]] = None  # Scores détaillés par type
 
 class PhraseSelector:
     """Sélecteur et monteur de phrases complètes"""
@@ -69,8 +70,10 @@ class PhraseSelector:
         self._load_semantic_data()
         
     def _load_semantic_data(self):
-        """Charge les analyses sémantiques correspondantes"""
+        """Charge les analyses sémantiques correspondantes et enrichit les phrases"""
         semantic_files = list(self.semantic_dir.glob("*_love_analysis.json"))
+        
+        print(f"🔍 Chargement de {len(semantic_files)} fichiers sémantiques...")
         
         for semantic_file in semantic_files:
             # Extraire le nom de base du fichier
@@ -80,10 +83,34 @@ class PhraseSelector:
                 with open(semantic_file, 'r', encoding='utf-8') as f:
                     semantic_data = json.load(f)
                 self.semantic_data[base_name] = semantic_data
+                
+                # Enrichir les phrases correspondantes
+                if 'transcription' in semantic_data and 'segments' in semantic_data['transcription']:
+                    # Le nom du fichier est dans metadata
+                    file_name = semantic_data['metadata']['file']
+                    
+                    matched_count = 0
+                    for segment in semantic_data['transcription']['segments']:
+                        segment_id = segment.get('id')
+                        
+                        # Trouver la phrase correspondante
+                        for phrase in self.phrases:
+                            if phrase.file_name == file_name and phrase.segment_id == segment_id:
+                                # Enrichir avec les données sémantiques
+                                phrase.love_type = segment.get('dominant_love_type')
+                                phrase.love_analysis = segment.get('love_analysis')
+                                matched_count += 1
+                                break
+                    
+                    if matched_count > 0:
+                        print(f"  ✓ {base_name}: {matched_count} phrases enrichies")
+                
             except Exception as e:
                 print(f"⚠️ Erreur chargement sémantique {semantic_file.name}: {e}")
         
-        print(f"📊 {len(self.semantic_data)} analyses sémantiques chargées")
+        # Compter combien de phrases ont été enrichies
+        enriched_count = sum(1 for p in self.phrases if p.love_analysis is not None)
+        print(f"📊 {len(self.semantic_data)} analyses sémantiques chargées, {enriched_count}/{len(self.phrases)} phrases enrichies")
         
     def _load_phrases_from_file(self, json_path: Path):
         """Charge les phrases d'un fichier de transcription"""
@@ -118,7 +145,8 @@ class PhraseSelector:
                     segment_id=segment['id'],
                     keywords_found=[],
                     match_score=0.0,
-                    love_type=None  # Sera enrichi plus tard
+                    love_type=None,  # Sera enrichi par _load_semantic_data()
+                    love_analysis=None  # Sera enrichi par _load_semantic_data()
                 )
                 
                 self.phrases.append(phrase)

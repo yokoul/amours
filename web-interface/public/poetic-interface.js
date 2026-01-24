@@ -10,6 +10,7 @@ class PoeticInterface {
         this.currentAudio = null;
         this.archive = [];
         this.archiveIsOpen = false;
+        this.spider = null;  // Visualisation sémantique
         
         this.init();
     }
@@ -312,7 +313,8 @@ class PoeticInterface {
                 audioFile: audioUrl,
                 phrase: fullPhrase,
                 phrases: result.phrases || [],
-                duration_seconds: result.duration_seconds
+                duration_seconds: result.duration_seconds,
+                semantic_analysis: result.semantic_analysis  // Ajouter l'analyse sémantique
             });
             
             // Sauvegarder dans l'archive
@@ -371,6 +373,43 @@ class PoeticInterface {
         
         // Contrôle de lecture
         playBtn.onclick = () => this.togglePlayback();
+        
+        // Visualisation sémantique
+        if (data.semantic_analysis) {
+            this.showSemanticVisualization(data.semantic_analysis);
+        }
+    }
+    
+    showSemanticVisualization(semanticData) {
+        console.log('🕷️ showSemanticVisualization appelé avec:', semanticData);
+        
+        if (!semanticData || Object.keys(semanticData).length === 0) {
+            console.warn('⚠️ Pas de données sémantiques à afficher');
+            return;
+        }
+        
+        // Créer le spider si nécessaire
+        if (!this.spider) {
+            console.log('🕷️ Création du spider...');
+            this.spider = new SpiderMinimal('spider-container', {
+                size: 280,
+                categories: Object.keys(semanticData)
+            });
+        }
+        
+        // Afficher les données avec animation
+        console.log('🕷️ Affichage des données:', semanticData);
+        this.spider.setData(semanticData, true);
+        
+        // Rendre visible avec transition
+        const container = document.getElementById('spider-container');
+        container.style.opacity = '0';
+        container.style.display = 'block';
+        
+        setTimeout(() => {
+            container.style.opacity = '1';
+            console.log('✅ Spider affiché');
+        }, 300);
     }
     
     togglePlayback() {
@@ -390,13 +429,43 @@ class PoeticInterface {
         const waveform = document.getElementById('waveform');
         waveform.innerHTML = '';
         
-        // Simulation de forme d'onde
-        for (let i = 0; i < 50; i++) {
+        // Créer des barres fixes qui s'animeront pendant la lecture
+        this.waveBars = [];
+        const numBars = 50;
+        
+        for (let i = 0; i < numBars; i++) {
             const bar = document.createElement('div');
             bar.className = 'wave-bar';
-            bar.style.height = `${Math.random() * 80 + 20}%`;
+            const baseHeight = 20 + Math.sin(i / 5) * 30 + Math.random() * 30;
+            bar.style.height = `${baseHeight}%`;
+            bar.setAttribute('data-base-height', baseHeight);
             waveform.appendChild(bar);
+            this.waveBars.push(bar);
         }
+        
+        // Animer pendant la lecture
+        if (this.audioElement) {
+            this.audioElement.addEventListener('timeupdate', () => {
+                if (!this.audioElement.paused) {
+                    this.animateWaveform();
+                }
+            });
+        }
+    }
+    
+    animateWaveform() {
+        if (!this.waveBars) return;
+        
+        const progress = this.audioElement.currentTime / this.audioElement.duration;
+        const currentBar = Math.floor(progress * this.waveBars.length);
+        
+        this.waveBars.forEach((bar, i) => {
+            if (i === currentBar) {
+                bar.classList.add('active');
+            } else {
+                bar.classList.remove('active');
+            }
+        });
     }
     
     /* ===========================

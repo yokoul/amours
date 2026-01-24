@@ -30,6 +30,15 @@ except ImportError as e:
     print(f"❌ Erreur import phrase_montage: {e}", file=sys.stderr)
     PHRASE_MONTAGE_AVAILABLE = False
 
+# Importer l'analyseur sémantique
+try:
+    sys.path.append(str(parent_dir / "src"))
+    from love_analyzer import LoveTypeAnalyzer
+    LOVE_ANALYZER_AVAILABLE = True
+except ImportError as e:
+    print(f"⚠️ Analyseur sémantique non disponible: {e}", file=sys.stderr)
+    LOVE_ANALYZER_AVAILABLE = False
+
 @dataclass
 class WebPhraseResult:
     """Résultat pour l'interface web"""
@@ -41,6 +50,7 @@ class WebPhraseResult:
     duration_seconds: Optional[float] = None
     keywords: List[str] = None
     timestamp: str = None
+    semantic_analysis: Optional[Dict[str, float]] = None  # Scores d'amour pour spidermap
     error: Optional[str] = None
 
 class WebPhraseGenerator:
@@ -61,6 +71,16 @@ class WebPhraseGenerator:
             )
         else:
             self.selector = None
+        
+        # Initialiser l'analyseur sémantique
+        if LOVE_ANALYZER_AVAILABLE:
+            self.love_analyzer = LoveTypeAnalyzer(
+                use_semantic_analysis=True,
+                reconstruct_sentences=False  # Pas besoin, on a déjà des phrases
+            )
+            print("✅ Analyseur sémantique initialisé", file=sys.stderr)
+        else:
+            self.love_analyzer = None
     
     def generate_web_phrases(self, keywords: List[str], num_phrases: int = 3) -> WebPhraseResult:
         """
@@ -150,8 +170,27 @@ class WebPhraseGenerator:
                     'start_time': phrase.start,
                     'end_time': phrase.end,
                     'duration': phrase.end - phrase.start,
-                    'love_type': getattr(phrase, 'love_type', None)
+                    'love_type': getattr(phrase, 'love_type', None),
+                    'love_analysis': getattr(phrase, 'love_analysis', None)  # Récupérer depuis le match
                 })
+            
+            # Calculer l'analyse sémantique globale (moyenne des phrases)
+            semantic_analysis = None
+            love_analyses = [p.get('love_analysis') for p in phrases_data if p.get('love_analysis')]
+            
+            if love_analyses:
+                # Calculer la moyenne des scores
+                all_keys = set()
+                for analysis in love_analyses:
+                    all_keys.update(analysis.keys())
+                
+                semantic_analysis = {}
+                for key in all_keys:
+                    scores = [a.get(key, 0) for a in love_analyses if key in a]
+                    if scores:
+                        semantic_analysis[key] = sum(scores) / len(scores)
+                
+                print(f"🕷️ Analyse sémantique globale: {semantic_analysis}", file=sys.stderr)
             
             return WebPhraseResult(
                 success=True,
@@ -161,7 +200,8 @@ class WebPhraseGenerator:
                 audio_base64=audio_base64,
                 duration_seconds=total_duration,
                 keywords=keywords,
-                timestamp=timestamp
+                timestamp=timestamp,
+                semantic_analysis=semantic_analysis
             )
             
         except Exception as e:
