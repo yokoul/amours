@@ -81,9 +81,20 @@ app.post('/api/generate-phrase', async (req, res) => {
         
         pythonProcess.on('close', (code) => {
             if (code === 0) {
+                // Nettoyer l'output dès le début pour éviter les problèmes d'emojis
+                let cleanOutput = output.trim();
+                
+                // Supprimer tout ce qui précède le premier { et suit le dernier }
+                const firstBrace = cleanOutput.indexOf('{');
+                const lastBrace = cleanOutput.lastIndexOf('}');
+                
+                if (firstBrace !== -1 && lastBrace !== -1 && firstBrace < lastBrace) {
+                    cleanOutput = cleanOutput.substring(firstBrace, lastBrace + 1);
+                }
+                
                 try {
                     // Parser la réponse JSON du script Python
-                    const result = JSON.parse(output);
+                    const result = JSON.parse(cleanOutput);
                     
                     // Créer une réponse sans l'audio base64 pour éviter les problèmes de parsing côté client
                     const safeResponse = {
@@ -133,21 +144,18 @@ app.post('/api/generate-phrase', async (req, res) => {
                     res.json(safeResponse);
                     
                 } catch (parseError) {
-                    console.error('❌ Erreur parsing JSON:', parseError);
-                    console.error('📄 Output reçu (premiers 500 chars):', output.substring(0, 500));
-                    console.error('📄 Output type:', typeof output);
-                    console.error('📄 Output length:', output.length);
+                    console.error('❌ Erreur parsing JSON après nettoyage:', parseError);
+                    console.error('📄 Output original (premiers 200 chars):', output.substring(0, 200));
+                    console.error('📄 Output nettoyé (premiers 200 chars):', cleanOutput?.substring(0, 200) || 'N/A');
                     
-                    // Tenter de nettoyer et re-parser
-                    try {
-                        const cleanOutput = output.trim().replace(/^[^{]*/, '').replace(/[^}]*$/, '');
-                        const result = JSON.parse(cleanOutput);
-                        console.log('✅ JSON nettoyé et parsé avec succès');
-                        res.json({success: true, ...result});
-                        return;
-                    } catch (secondParseError) {
-                        console.error('❌ Echec du parsing de secours:', secondParseError);
-                    }
+                    res.status(500).json({
+                        success: false,
+                        error: 'Erreur de traitement de la réponse Python',
+                        debug: {
+                            outputLength: output.length,
+                            hasJSON: output.includes('{') && output.includes('}')
+                        }
+                    });
                     
                     res.status(500).json({
                         success: false,
