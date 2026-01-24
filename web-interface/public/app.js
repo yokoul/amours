@@ -60,10 +60,12 @@ class SpectacleApp {
             case 'phrase_generated':
                 console.log('🎵 Phrase générée reçue via WebSocket', data.data);
                 
-                // Traiter l'audio si disponible via WebSocket
-                if (data.data && data.data.audio_url) {
-                    this.handleWebSocketAudio(data.data);
-                }
+                // TEMPORAIREMENT DÉSACTIVÉ - L'audio arrive maintenant via HTTP response
+                // if (data.data && data.data.audio_url) {
+                //     this.handleWebSocketAudio(data.data);
+                // }
+                
+                console.log('ℹ️ Audio désormais traité via HTTP response, pas WebSocket');
                 break;
             default:
                 console.log('📨 Message WebSocket:', data);

@@ -96,6 +96,11 @@ app.post('/api/generate-phrase', async (req, res) => {
                     // Parser la réponse JSON du script Python
                     const result = JSON.parse(cleanOutput);
                     
+                    // Debug: voir ce que contient result
+                    console.log('🔍 Clés disponibles dans result:', Object.keys(result));
+                    console.log('🔍 Audio base64 présent:', !!result.audio_base64);
+                    console.log('🔍 Audio URL présent:', !!result.audio_url);
+                    
                     // Créer une réponse sans l'audio base64 pour éviter les problèmes de parsing côté client
                     const safeResponse = {
                         success: true,
@@ -126,6 +131,16 @@ app.post('/api/generate-phrase', async (req, res) => {
                         } catch (audioError) {
                             console.warn('Erreur sauvegarde audio:', audioError);
                         }
+                    } else if (result.audio_url) {
+                        // Le script Python a déjà fourni une URL d'audio
+                        console.log('📻 URL audio fournie par Python:', result.audio_url);
+                        safeResponse.audio_url = result.audio_url;
+                    } else if (result.audio_file) {
+                        // Le script Python a fourni un chemin de fichier
+                        console.log('📻 Fichier audio fourni par Python:', result.audio_file);
+                        // Construire l'URL relative depuis le nom de fichier
+                        const fileName = result.audio_file.split('/').pop();
+                        safeResponse.audio_url = `/audio/${fileName}`;
                     }
                     
                     // Broadcaster le résultat à tous les clients APRÈS création audio

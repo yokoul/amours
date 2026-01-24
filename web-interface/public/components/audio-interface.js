@@ -6,6 +6,7 @@ class AudioInterface {
         this.spiderSemantic = null;
         this.currentAudioElement = null;
         this.visualizerConnected = false;
+        this.addedTracks = new Set(); // Tracking pour éviter les doublons
         
         // L'initialisation sera appelée manuellement
     }
@@ -116,6 +117,15 @@ class AudioInterface {
             console.error('❌ Player non initialisé');
             return;
         }
+        
+        // Vérifier les doublons
+        if (this.addedTracks.has(audioUrl)) {
+            console.log('⚠️ Track déjà ajouté, ignoré:', audioUrl.substring(audioUrl.lastIndexOf('/') + 1));
+            return null;
+        }
+        
+        // Marquer comme ajouté
+        this.addedTracks.add(audioUrl);
         
         // Ajouter au player
         const trackId = this.player.addTrack(audioUrl, metadata);
