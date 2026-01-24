@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from pydub import AudioSegment
 import difflib
 import random
+import math
 
 # Ajouter le répertoire src au path
 sys.path.append(str(Path(__file__).parent.parent / "src"))
@@ -59,7 +60,8 @@ class PhraseSelector:
                 data = json.load(f)
             
             file_name = data['metadata']['file']
-            audio_path = self.audio_dir / file_name
+            # Utiliser le chemin réel du fichier audio du JSON au lieu de construire manuellement
+            audio_path = data['metadata'].get('path', self.audio_dir / file_name)
             
             # Utiliser directement les segments qui sont déjà des phrases
             for segment in data['transcription']['segments']:
@@ -268,7 +270,8 @@ class PhraseSelector:
                               output_file: str,
                               gap_duration: float = 1.5,
                               fade_in_duration: float = 0.3,
-                              fade_out_duration: float = 0.3) -> str:
+                              fade_out_duration: float = 0.3,
+                              normalize: str = "rms") -> str:
         """
         Génère un montage audio des phrases sélectionnées
         
@@ -308,6 +311,10 @@ class PhraseSelector:
             
             phrase_audio = source_audio[start_ms:end_ms]
             
+            # Normaliser l'audio pour équilibrer les volumes
+            if normalize and normalize != "none":
+                phrase_audio = self.normalize_audio(phrase_audio, normalize)
+            
             # Appliquer les fondus
             if fade_in_duration > 0:
                 fade_in_ms = int(fade_in_duration * 1000)
@@ -344,6 +351,38 @@ class PhraseSelector:
             self.audio_cache[audio_path] = AudioSegment.from_file(audio_path)
         
         return self.audio_cache[audio_path]
+    
+    def normalize_audio(self, audio: AudioSegment, method: str = "peak") -> AudioSegment:
+        """Normalise l'audio selon différentes méthodes
+        
+        Args:
+            audio: Segment audio à normaliser
+            method: "peak", "rms" ou "loudness"
+        """
+        if method == "peak":
+            # Normalisation par pic (plus simple et rapide)
+            return audio.normalize()
+        
+        elif method == "rms":
+            # Normalisation par RMS (Root Mean Square) - plus équilibré
+            target_dBFS = -20.0  # Volume cible
+            change_in_dBFS = target_dBFS - audio.dBFS
+            return audio.apply_gain(change_in_dBFS)
+        
+        elif method == "loudness":
+            # Normalisation par loudness perçue (EBU R128-like)
+            # Approximation simple basée sur RMS pondéré
+            target_dBFS = -23.0  # Standard broadcast
+            current_rms = audio.rms
+            if current_rms > 0:
+                # Calcul simplifié du gain nécessaire
+                target_rms = 10 ** (target_dBFS / 20) * audio.max_possible_amplitude
+                gain_ratio = target_rms / current_rms
+                gain_db = 20 * math.log10(gain_ratio) if gain_ratio > 0 else 0
+                return audio.apply_gain(min(max(gain_db, -30), 30))  # Limiter le gain
+            return audio
+        
+        return audio  # Méthode inconnue, retourner tel quel
 
 def main():
     """Interface en ligne de commande"""
@@ -409,7 +448,8 @@ def main():
             output_file,
             gap_duration=1.5,  # 1.5s de silence entre phrases
             fade_in_duration=0.2,
-            fade_out_duration=0.2
+            fade_out_duration=0.2,
+            normalize="rms"  # Normalisation RMS pour équilibrer les volumes
         )
         
         print(f"🎧 Lecture automatique...")
