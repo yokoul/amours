@@ -188,6 +188,7 @@ class PoeticInterface {
         this.bindEvents();
         this.setupGestures();
         this.loadArchive();
+        this.updateGenerateButton();
         console.log('🎭 Interface poétique initialisée');
     }
     
@@ -254,7 +255,7 @@ class PoeticInterface {
         
         // Bouton de génération
         const generateBtn = document.getElementById('generate-btn');
-        generateBtn.addEventListener('click', () => this.generatePhrases());
+        generateBtn.addEventListener('click', () => this.handleGenerateClick());
         
         // Boutons de contrôle de longueur
         document.querySelectorAll('.length-btn').forEach(btn => {
@@ -476,11 +477,37 @@ class PoeticInterface {
     
     updateGenerateButton() {
         const btn = document.getElementById('generate-btn');
+        const label = btn.querySelector('span');
         if (this.selectedWords.length >= 2) {
             btn.classList.add('ready');
+            btn.classList.remove('shake-mode');
+            if (label) label.textContent = 'créer';
         } else {
             btn.classList.remove('ready');
+            btn.classList.add('shake-mode');
+            if (label) label.textContent = 'autres mots';
         }
+    }
+
+    handleGenerateClick() {
+        if (this.selectedWords.length < 2) {
+            this.refreshWordList();
+            return;
+        }
+
+        this.generatePhrases();
+    }
+
+    async refreshWordList() {
+        const btn = document.getElementById('generate-btn');
+        btn.classList.add('shake');
+        setTimeout(() => btn.classList.remove('shake'), 400);
+
+        this.selectedWords = [];
+        this.updateSelectedWordsDisplay();
+        this.updateGenerateButton();
+
+        await this.loadWords();
     }
     
     /* ===========================
@@ -776,7 +803,7 @@ class PoeticInterface {
         
         if (this.audioElement.paused) {
             this.audioElement.play();
-            playBtn.innerHTML = '<span class="play-symbol">⏸</span>';
+            playBtn.innerHTML = '<span class="play-symbol">❙❙</span>';
             this.hapticFeedback();
         } else {
             this.audioElement.pause();

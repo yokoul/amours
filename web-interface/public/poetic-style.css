@@ -356,13 +356,17 @@ body {
     cursor: pointer;
     transition: var(--medium-transition);
     text-transform: lowercase;
-    opacity: 0.5;
-    pointer-events: none;
+    opacity: 0.7;
+    pointer-events: all;
 }
 
 .generate-btn.ready {
     opacity: 1;
     pointer-events: all;
+}
+
+.generate-btn.shake-mode {
+    opacity: 0.85;
 }
 
 .generate-btn.ready:hover {
@@ -372,6 +376,18 @@ body {
 
 .generate-btn:active {
     transform: scale(0.95);
+}
+
+.generate-btn.shake {
+    animation: shake 0.4s ease-in-out;
+}
+
+@keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    20% { transform: translateX(-3px); }
+    40% { transform: translateX(3px); }
+    60% { transform: translateX(-2px); }
+    80% { transform: translateX(2px); }
 }
 
 /* ===========================
@@ -475,6 +491,7 @@ body {
 .play-symbol {
     font-size: 24px;
     margin-left: 4px; /* Centrer visuellement le triangle */
+    color: inherit; /* Force l'héritage de la couleur pour éviter les emojis gris */
 }
 
 /* Ancienne barre de progression retirée - remplacée par le waveform */
