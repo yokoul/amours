@@ -908,6 +908,7 @@ class PoeticInterface {
         document.getElementById('word-cloud').innerHTML = '';
     }
     
+    
     /* ===========================
        FEEDBACK & ANIMATIONS
        =========================== */
