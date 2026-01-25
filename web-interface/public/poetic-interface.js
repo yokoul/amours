@@ -418,8 +418,35 @@ class PoeticInterface {
             const wordEl = document.createElement('span');
             wordEl.className = 'selected-word';
             wordEl.textContent = word;
+            
+            // Permettre de retirer en cliquant/touchant
+            wordEl.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.unselectWord(word);
+            });
+            
             container.appendChild(wordEl);
         });
+    }
+    
+    unselectWord(word) {
+        // Retirer le mot de la liste
+        const index = this.selectedWords.indexOf(word);
+        if (index > -1) {
+            this.selectedWords.splice(index, 1);
+        }
+        
+        // Retirer la classe 'selected' du mot dans le nuage
+        const wordElements = document.querySelectorAll('.word-item');
+        wordElements.forEach(el => {
+            if (el.textContent === word) {
+                el.classList.remove('selected');
+            }
+        });
+        
+        // Mettre à jour l'affichage
+        this.updateSelectedWordsDisplay();
+        this.updateGenerateButton();
     }
     
     updateGenerateButton() {
@@ -609,20 +636,24 @@ class PoeticInterface {
             indicator.style.opacity = 0.3 + (dominantType[1] * 0.7); // Intensité
             point.appendChild(indicator);
             
-            // Tooltip avec détails au survol (desktop) et au touch (mobile)
+            // Détection tactile vs souris
+            const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
             let tooltipVisible = false;
             
-            point.addEventListener('mouseenter', () => {
-                this.showTimelineTooltip(point, phrase, index);
-                tooltipVisible = true;
-            });
+            if (!isTouchDevice) {
+                // Desktop: hover
+                point.addEventListener('mouseenter', () => {
+                    this.showTimelineTooltip(point, phrase, index);
+                    tooltipVisible = true;
+                });
+                
+                point.addEventListener('mouseleave', () => {
+                    this.hideTimelineTooltip();
+                    tooltipVisible = false;
+                });
+            }
             
-            point.addEventListener('mouseleave', () => {
-                this.hideTimelineTooltip();
-                tooltipVisible = false;
-            });
-            
-            // Support tactile pour mobile
+            // Mobile et Desktop: click pour toggle
             point.addEventListener('click', (e) => {
                 e.stopPropagation();
                 if (tooltipVisible) {

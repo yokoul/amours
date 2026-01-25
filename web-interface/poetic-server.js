@@ -99,33 +99,29 @@ class PoeticServer {
        =========================== */
     
     async getInspirationalWords() {
-        // Pool de mots poétiques sur le thème de l'amour
+        // Pool de mots réellement présents dans les transcriptions audio
+        // Liste nettoyée : 90 mots (doublons et variations retirés)
         const loveWords = [
-            'passion', 'désir', 'tendresse', 'émotion', 'flamme',
-            'cœur', 'âme', 'rêve', 'espoir', 'joie',
-            'bonheur', 'extase', 'ivresse', 'folie', 'délire',
-            'baiser', 'caresse', 'étreinte', 'regard', 'sourire',
-            'larme', 'soupir', 'frisson', 'trouble', 'émoi',
-            'séduction', 'charme', 'beauté', 'grâce', 'élégance',
-            'étoile', 'lune', 'soleil', 'nuit', 'jour',
-            'silence', 'murmure', 'chanson', 'mélodie', 'harmonie',
-            'danse', 'valse', 'élan', 'envol', 'fuite',
-            'lumière', 'vertige', 'abandon', 'mystère', 'délice',
-            'fusion', 'souffle', 'éternité', 'instant', 'promesse',
-            'amant', 'attente', 'nostalgie', 'souvenir', 'rencontre',
-            'adieu', 'absence', 'présence', 'douceur', 'chaleur',
-            'feu', 'ardeur', 'langueur', 'tourment', 'supplice',
-            'ravissement', 'enchantement', 'émerveillement', 'plaisir', 'volupté',
-            'confidence', 'secret', 'aveu', 'serment', 'fidélité',
-            'trahison', 'jalousie', 'tristesse', 'mélancolie', 'chagrin',
-            'consolation', 'réconfort', 'apaisement', 'sérénité', 'paix',
-            'tempête', 'orage', 'calme', 'brise', 'vent',
-            'mer', 'vague', 'rivage', 'horizon', 'infini',
-            'rire', 'pleur', 'sanglot', 'gémissement', 'cri',
-            'voix', 'parole', 'mot', 'lettre', 'message',
-            'toucher', 'peau', 'corps', 'main', 'lèvre',
-            'œil', 'visage', 'cheveux', 'parfum', 'odeur',
-            'goût', 'saveur', 'sensation', 'sentiment', 'impression'
+            'amour', 'aimer', 'amoureux', 'amoureuse', 'amitié',
+            'passion', 'désir', 'tendresse', 'émotion', 'sentiment',
+            'joie', 'bonheur', 'tristesse', 'peur', 'colère',
+            'jalousie', 'haine', 'espoir', 'pensée', 'rêve',
+            'cœur', 'corps', 'sang', 'main', 'yeux',
+            'visage', 'voix', 'sourire', 'regard', 'esprit',
+            'famille', 'mère', 'père', 'enfant', 'frère',
+            'sœur', 'couple', 'amant', 'mariage', 'divorce',
+            'rencontre', 'séparation', 'absence', 'présence', 'distance',
+            'attente', 'souvenir', 'mémoire', 'nostalgie', 'passé',
+            'présent', 'futur', 'hier', 'instant', 'moment',
+            'temps', 'toujours', 'jamais', 'mort', 'vie',
+            'manque', 'besoin', 'envie', 'vide', 'plein',
+            'grand', 'petit', 'fort', 'léger', 'profond',
+            'chaud', 'froid', 'lumière', 'terre', 'lieu',
+            'maison', 'chambre', 'jardin', 'ville', 'chemin',
+            'dire', 'parler', 'voir', 'regarder', 'entendre',
+            'écouter', 'sentir', 'toucher', 'venir', 'partir',
+            'rester', 'tomber', 'marcher', 'devenir', 'polyamour',
+            'trahison', 'fidélité', 'odeur', 'couleur', 'chant'
         ];
         
         // Mélanger aléatoirement

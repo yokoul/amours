@@ -245,6 +245,18 @@ body {
     font-size: 14px;
     letter-spacing: 1px;
     animation: slideIn 0.4s ease-out;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+}
+
+.selected-word:hover {
+    background: var(--grey-dark);
+    transform: scale(0.95);
+}
+
+.selected-word:active {
+    transform: scale(0.9);
 }
 
 @keyframes slideIn {
@@ -360,6 +372,9 @@ body {
 .play-btn {
     width: 80px;
     height: 80px;
+    min-width: 80px;
+    min-height: 80px;
+    flex-shrink: 0;
     border: 2px solid var(--black);
     border-radius: 50%;
     background: var(--white);
@@ -725,6 +740,27 @@ body {
     .word-item {
         font-size: 14px;
         padding: var(--space-xs) var(--space-s);
+    }
+    
+    /* Réduire la taille du player sur mobile */
+    .controls {
+        gap: var(--space-s);
+    }
+    
+    .play-btn {
+        width: 60px;
+        height: 60px;
+        min-width: 60px;
+        min-height: 60px;
+    }
+    
+    .play-symbol {
+        font-size: 18px;
+    }
+    
+    .waveform {
+        height: 30px;
+    }
     }
     
     .play-btn {
