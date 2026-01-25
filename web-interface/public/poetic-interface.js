@@ -185,11 +185,39 @@ class PoeticInterface {
     }
     
     init() {
+        this.loadTheme();
         this.bindEvents();
         this.setupGestures();
         this.loadArchive();
         this.updateGenerateButton();
         console.log('🎭 Interface poétique initialisée');
+    }
+    
+    /* ===========================
+       GESTION DU THÈME
+       =========================== */
+    
+    loadTheme() {
+        // Charger le thème depuis localStorage
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'dark') {
+            document.body.setAttribute('data-theme', 'dark');
+        }
+    }
+    
+    toggleTheme() {
+        const currentTheme = document.body.getAttribute('data-theme');
+        const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        
+        if (newTheme === 'dark') {
+            document.body.setAttribute('data-theme', 'dark');
+            localStorage.setItem('theme', 'dark');
+        } else {
+            document.body.removeAttribute('data-theme');
+            localStorage.setItem('theme', 'light');
+        }
+        
+        console.log(`🎨 Thème changé: ${newTheme}`);
     }
     
     /* ===========================
@@ -263,6 +291,13 @@ class PoeticInterface {
                 const mode = parseInt(e.target.getAttribute('data-mode'));
                 this.setIncludeNextMode(mode);
             });
+        });
+        
+        // Bouton de changement de thème
+        const themeToggle = document.getElementById('theme-toggle');
+        themeToggle?.addEventListener('click', () => {
+            this.hapticFeedback();
+            this.toggleTheme();
         });
         
         // Navigation d'état
@@ -957,7 +992,17 @@ class PoeticInterface {
     }
     
     showLoading() {
-        // Implémentation d'un loading subtil
+        // Overlay grisé
+        let overlay = document.getElementById('loading-overlay');
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'loading-overlay';
+            overlay.className = 'loading-overlay';
+            document.body.appendChild(overlay);
+        }
+        overlay.classList.add('show');
+        
+        // Spinner
         document.body.style.cursor = 'wait';
         let loader = document.getElementById('loading-indicator');
         if (!loader) {
@@ -971,6 +1016,12 @@ class PoeticInterface {
     
     hideLoading() {
         document.body.style.cursor = 'default';
+        
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) {
+            overlay.classList.remove('show');
+        }
+        
         const loader = document.getElementById('loading-indicator');
         if (loader) {
             loader.classList.remove('show');
