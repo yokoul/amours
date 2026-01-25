@@ -269,6 +269,13 @@ class PoeticInterface {
         
         archiveBtn?.addEventListener('click', () => this.openArchive());
         closeArchive?.addEventListener('click', () => this.closeArchive());
+        
+        // Fermer le tooltip timeline si on clique ailleurs
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.timeline-point')) {
+                this.hideTimelineTooltip();
+            }
+        });
     }
     
     setupGestures() {
@@ -514,7 +521,6 @@ class PoeticInterface {
     setupAudioPlayer(data) {
         const phraseDisplay = document.getElementById('phrase-display');
         const playBtn = document.getElementById('play-btn');
-        const progressBar = document.getElementById('progress-bar');
         
         // Afficher le texte de la phrase
         phraseDisplay.textContent = data.phrase || 'Création poétique';
@@ -534,94 +540,144 @@ class PoeticInterface {
         });
         
         this.audioElement.addEventListener('timeupdate', () => {
-            const progress = (this.audioElement.currentTime / this.audioElement.duration) * 100;
-            progressBar.style.width = `${progress}%`;
+            // La progression est maintenant affichée par le waveform
+            if (this.audioElement && !this.audioElement.paused) {
+                this.animateWaveform();
+            }
         });
         
         this.audioElement.addEventListener('ended', () => {
             playBtn.innerHTML = '<span class="play-symbol">▶</span>';
-            progressBar.style.width = '0%';
+            // Réinitialiser le waveform
+            if (this.waveBars) {
+                this.waveBars.forEach(bar => bar.classList.remove('active'));
+            }
         });
         
         // Contrôle de lecture
         playBtn.onclick = () => this.togglePlayback();
         
-        // Afficher les barres sémantiques pour chaque phrase
+        // Afficher la timeline sémantique pour chaque phrase
         if (data.phrases && data.phrases.length > 0) {
-            this.showSemanticBars(data.phrases);
+            this.showSemanticTimeline(data.phrases);
         }
     }
     
-    showSemanticBars(phrases) {
-        console.log('📊 Affichage barres sémantiques pour', phrases.length, 'phrases');
+    showSemanticTimeline(phrases) {
+        console.log('📈 Affichage timeline sémantique pour', phrases.length, 'phrases');
         
         // Créer ou récupérer le conteneur
-        let container = document.getElementById('semantic-bars');
+        let container = document.getElementById('semantic-timeline');
         if (!container) {
             const audioPlayer = document.getElementById('audio-player');
             container = document.createElement('div');
-            container.id = 'semantic-bars';
-            container.className = 'semantic-bars';
+            container.id = 'semantic-timeline';
+            container.className = 'semantic-timeline';
             audioPlayer.appendChild(container);
         }
         
         container.innerHTML = ''; // Clear
         
-        // Pour chaque phrase, créer un groupe de barres
+        // Ligne horizontale principale
+        const timeline = document.createElement('div');
+        timeline.className = 'timeline-track';
+        
+        // Pour chaque phrase, créer un point sur la timeline
         phrases.forEach((phrase, index) => {
             if (!phrase.love_analysis) return;
             
-            const phraseGroup = document.createElement('div');
-            phraseGroup.className = 'phrase-bars';
+            // Trouver le type d'amour dominant
+            const dominantType = Object.entries(phrase.love_analysis)
+                .sort((a, b) => b[1] - a[1])[0];
             
-            // Titre de la phrase (court)
-            const phraseText = document.createElement('div');
-            phraseText.className = 'phrase-mini';
-            phraseText.textContent = `${index + 1}. ${phrase.text.substring(0, 50)}...`;
-            phraseGroup.appendChild(phraseText);
+            // Créer le point de la phrase
+            const point = document.createElement('div');
+            point.className = 'timeline-point';
+            point.setAttribute('data-phrase-index', index);
             
-            // Conteneur des barres
-            const barsContainer = document.createElement('div');
-            barsContainer.className = 'bars-container';
+            // Numéro de la phrase
+            const number = document.createElement('div');
+            number.className = 'point-number';
+            number.textContent = index + 1;
+            point.appendChild(number);
             
-            // Créer une barre par type d'amour
-            Object.entries(phrase.love_analysis)
-                .sort((a, b) => b[1] - a[1]) // Trier par valeur décroissante
-                .forEach(([type, value]) => {
-                    const barRow = document.createElement('div');
-                    barRow.className = 'bar-row';
-                    
-                    // Label du type
-                    const label = document.createElement('div');
-                    label.className = 'bar-label';
-                    label.textContent = type;
-                    barRow.appendChild(label);
-                    
-                    // Barre de progression
-                    const barTrack = document.createElement('div');
-                    barTrack.className = 'bar-track';
-                    
-                    const barFill = document.createElement('div');
-                    barFill.className = 'bar-fill';
-                    barFill.style.width = `${value * 100}%`;
-                    barTrack.appendChild(barFill);
-                    barRow.appendChild(barTrack);
-                    
-                    // Pourcentage
-                    const percentage = document.createElement('div');
-                    percentage.className = 'bar-percentage';
-                    percentage.textContent = `${(value * 100).toFixed(0)}%`;
-                    barRow.appendChild(percentage);
-                    
-                    barsContainer.appendChild(barRow);
-                });
+            // Indicateur du type dominant (code couleur ou lettre)
+            const indicator = document.createElement('div');
+            indicator.className = 'point-indicator';
+            indicator.textContent = dominantType[0].substring(0, 3).toUpperCase();
+            indicator.title = `${dominantType[0]}: ${(dominantType[1] * 100).toFixed(0)}%`;
+            indicator.style.opacity = 0.3 + (dominantType[1] * 0.7); // Intensité
+            point.appendChild(indicator);
             
-            phraseGroup.appendChild(barsContainer);
-            container.appendChild(phraseGroup);
+            // Tooltip avec détails au survol (desktop) et au touch (mobile)
+            let tooltipVisible = false;
+            
+            point.addEventListener('mouseenter', () => {
+                this.showTimelineTooltip(point, phrase, index);
+                tooltipVisible = true;
+            });
+            
+            point.addEventListener('mouseleave', () => {
+                this.hideTimelineTooltip();
+                tooltipVisible = false;
+            });
+            
+            // Support tactile pour mobile
+            point.addEventListener('click', (e) => {
+                e.stopPropagation();
+                if (tooltipVisible) {
+                    this.hideTimelineTooltip();
+                    tooltipVisible = false;
+                } else {
+                    this.showTimelineTooltip(point, phrase, index);
+                    tooltipVisible = true;
+                }
+            });
+            
+            timeline.appendChild(point);
         });
         
+        container.appendChild(timeline);
         container.style.display = 'block';
-        console.log('✅ Barres affichées');
+        console.log('✅ Timeline affichée');
+    }
+    
+    showTimelineTooltip(pointElement, phrase, index) {
+        // Créer ou récupérer le tooltip
+        let tooltip = document.getElementById('timeline-tooltip');
+        if (!tooltip) {
+            tooltip = document.createElement('div');
+            tooltip.id = 'timeline-tooltip';
+            tooltip.className = 'timeline-tooltip';
+            document.body.appendChild(tooltip);
+        }
+        
+        // Contenu du tooltip
+        let content = `<div class="tooltip-phrase">${index + 1}. ${phrase.text.substring(0, 60)}...</div>`;
+        content += '<div class="tooltip-values">';
+        
+        Object.entries(phrase.love_analysis)
+            .sort((a, b) => b[1] - a[1])
+            .forEach(([type, value]) => {
+                const percentage = (value * 100).toFixed(0);
+                content += `<div class="tooltip-row"><span>${type}</span><span>${percentage}%</span></div>`;
+            });
+        
+        content += '</div>';
+        tooltip.innerHTML = content;
+        
+        // Positionner le tooltip
+        const rect = pointElement.getBoundingClientRect();
+        tooltip.style.left = `${rect.left + rect.width / 2}px`;
+        tooltip.style.top = `${rect.top - 10}px`;
+        tooltip.style.display = 'block';
+    }
+    
+    hideTimelineTooltip() {
+        const tooltip = document.getElementById('timeline-tooltip');
+        if (tooltip) {
+            tooltip.style.display = 'none';
+        }
     }
     
     showSemanticVisualization(semanticData) {
@@ -677,25 +733,17 @@ class PoeticInterface {
         
         // Créer des barres fixes qui s'animeront pendant la lecture
         this.waveBars = [];
-        const numBars = 50;
+        const numBars = 60;
         
         for (let i = 0; i < numBars; i++) {
             const bar = document.createElement('div');
             bar.className = 'wave-bar';
-            const baseHeight = 20 + Math.sin(i / 5) * 30 + Math.random() * 30;
+            // Variation de hauteur basée sur une courbe sinusoïdale
+            const baseHeight = 30 + Math.sin(i / 8) * 40 + Math.random() * 30;
             bar.style.height = `${baseHeight}%`;
             bar.setAttribute('data-base-height', baseHeight);
             waveform.appendChild(bar);
             this.waveBars.push(bar);
-        }
-        
-        // Animer pendant la lecture
-        if (this.audioElement) {
-            this.audioElement.addEventListener('timeupdate', () => {
-                if (!this.audioElement.paused) {
-                    this.animateWaveform();
-                }
-            });
         }
     }
     

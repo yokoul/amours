@@ -16,6 +16,11 @@
    python src/main.py --input audio/discussion.wav --output output/transcription.json --model medium --language fr --format json
    ```
 
+4. **Transformation complète par le launcher interactif** (may note) :
+   ```bash
+   source .venv/bin/activate && python launcher_interactif.py
+   ```
+
 ## Options disponibles
 
 - `--model` : Modèle Whisper (tiny, base, small, medium, large)
