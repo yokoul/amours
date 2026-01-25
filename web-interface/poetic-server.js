@@ -51,7 +51,7 @@ class PoeticServer {
         // API pour génération poétique
         this.app.post('/api/generate', async (req, res) => {
             try {
-                const { words, count = 3 } = req.body; // Par défaut 3 phrases
+                const { words, count = 3, includeNext = 0 } = req.body; // Par défaut 3 phrases, mode normal
                 
                 if (!words || words.length < 2) {
                     return res.status(400).json({ 
@@ -59,9 +59,10 @@ class PoeticServer {
                     });
                 }
                 
-                console.log(`🎪 Génération demandée: ${count} phrases avec mots: ${words.join(', ')}`);
+                const modeText = includeNext > 0 ? ` (mode étendu +${includeNext})` : '';
+                console.log(`🎪 Génération demandée: ${count} phrases avec mots: ${words.join(', ')}${modeText}`);
                 
-                const result = await this.generatePoetry(words, count);
+                const result = await this.generatePoetry(words, count, includeNext);
                 res.json(result);
                 
             } catch (error) {
@@ -137,16 +138,23 @@ class PoeticServer {
        GÉNÉRATION POÉTIQUE
        =========================== */
     
-    async generatePoetry(words, count = 3) {
+    async generatePoetry(words, count = 3, includeNext = 0) {
         return new Promise((resolve, reject) => {
             // Utiliser le script web_phrase_generator.py (optimisé pour le web)
             const script = path.join(__dirname, 'web_phrase_generator.py');
             
-            const python = spawn(this.pythonPath, [
-                script,
-                count.toString(), // Nombre de phrases
-                ...words // Les mots
-            ], {
+            // Construire les arguments Python
+            const pythonArgs = [script, count.toString()];
+            
+            // Ajouter le paramètre --include-next si > 0
+            if (includeNext > 0) {
+                pythonArgs.push(`--include-next=${includeNext}`);
+            }
+            
+            // Ajouter les mots
+            pythonArgs.push(...words);
+            
+            const python = spawn(this.pythonPath, pythonArgs, {
                 cwd: this.projectRoot,
                 env: { 
                     ...process.env, 

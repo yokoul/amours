@@ -175,6 +175,7 @@ class PoeticInterface {
     constructor() {
         this.currentState = 'contemplation';
         this.selectedWords = [];
+        this.includeNextMode = 0; // Mode de longueur: 0=court, 1=moyen, 2=long
         this.currentAudio = null;
         this.archive = [];
         this.archiveIsOpen = false;
@@ -254,6 +255,14 @@ class PoeticInterface {
         // Bouton de génération
         const generateBtn = document.getElementById('generate-btn');
         generateBtn.addEventListener('click', () => this.generatePhrases());
+        
+        // Boutons de contrôle de longueur
+        document.querySelectorAll('.length-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const mode = parseInt(e.target.getAttribute('data-mode'));
+                this.setIncludeNextMode(mode);
+            });
+        });
         
         // Navigation d'état
         document.querySelectorAll('.nav-btn').forEach(btn => {
@@ -449,6 +458,22 @@ class PoeticInterface {
         this.updateGenerateButton();
     }
     
+    setIncludeNextMode(mode) {
+        this.includeNextMode = mode;
+        
+        // Mettre à jour les boutons visuellement
+        document.querySelectorAll('.length-btn').forEach(btn => {
+            const btnMode = parseInt(btn.getAttribute('data-mode'));
+            if (btnMode === mode) {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+        
+        console.log(`📏 Mode de longueur: ${mode === 0 ? 'court' : mode === 1 ? 'moyen (+1)' : 'long (+2)'}`);
+    }
+    
     updateGenerateButton() {
         const btn = document.getElementById('generate-btn');
         if (this.selectedWords.length >= 2) {
@@ -473,7 +498,8 @@ class PoeticInterface {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     words: this.selectedWords,
-                    count: this.selectedWords.length // Une phrase par mot sélectionné
+                    count: this.selectedWords.length, // Une phrase par mot sélectionné
+                    includeNext: this.includeNextMode // 0, 1 ou 2 phrases suivantes
                 })
             });
             

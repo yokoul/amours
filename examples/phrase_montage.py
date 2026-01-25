@@ -56,6 +56,7 @@ class PhraseSelector:
         self.phrases: List[PhraseMatch] = []
         self.audio_cache: Dict[str, AudioSegment] = {}
         self.semantic_data: Dict[str, Dict] = {}  # Cache pour les données sémantiques
+        self.transcription_data: Dict[str, Dict] = {}  # Cache des transcriptions complètes
         
     def load_phrases(self):
         """Charge toutes les phrases des transcriptions"""
@@ -119,6 +120,9 @@ class PhraseSelector:
                 data = json.load(f)
             
             file_name = data['metadata']['file']
+            # Stocker les données complètes pour pouvoir accéder aux phrases suivantes
+            self.transcription_data[file_name] = data
+            
             # Utiliser le chemin réel du fichier audio du JSON au lieu de construire manuellement
             audio_path = data['metadata'].get('path', self.audio_dir / file_name)
             
@@ -329,13 +333,63 @@ class PhraseSelector:
         
         return text
     
+    def _get_next_phrase_same_speaker(self, phrase: PhraseMatch, num_next: int = 1) -> Optional[float]:
+        """
+        Trouve la fin de la Nième phrase suivante si elle est du même intervenant.
+        
+        Args:
+            phrase: La phrase actuelle
+            num_next: Nombre de phrases suivantes à inclure
+            
+        Returns:
+            Le timestamp de fin étendu, ou None si pas de phrase suivante du même intervenant
+        """
+        # Récupérer les données de transcription
+        if phrase.file_name not in self.transcription_data:
+            return None
+        
+        data = self.transcription_data[phrase.file_name]
+        segments = data['transcription']['segments']
+        
+        # Trouver le segment actuel
+        current_idx = None
+        for idx, seg in enumerate(segments):
+            if seg['id'] == phrase.segment_id:
+                current_idx = idx
+                break
+        
+        if current_idx is None:
+            return None
+        
+        # Vérifier les N phrases suivantes
+        extended_end = phrase.end
+        phrases_added = 0
+        
+        for i in range(1, num_next + 1):
+            next_idx = current_idx + i
+            if next_idx >= len(segments):
+                break
+            
+            next_segment = segments[next_idx]
+            
+            # Vérifier que c'est le même intervenant
+            if next_segment['speaker'] != phrase.speaker:
+                break
+            
+            # Étendre jusqu'à la fin de cette phrase
+            extended_end = next_segment['end']
+            phrases_added += 1
+        
+        return extended_end if phrases_added > 0 else None
+    
     def generate_phrase_montage(self, phrases: List[PhraseMatch], 
                               output_file: str,
                               gap_duration: float = 1.5,
                               fade_in_duration: float = 0.3,
                               fade_out_duration: float = 0.3,
                               normalize: str = "rms",
-                              keywords: List[str] = None) -> str:
+                              keywords: List[str] = None,
+                              include_next_phrases: int = 0) -> str:
         """
         Génère un montage audio des phrases sélectionnées
         
@@ -345,6 +399,7 @@ class PhraseSelector:
             gap_duration: Silence entre phrases (secondes)
             fade_in_duration: Durée du fondu d'entrée (secondes)
             fade_out_duration: Durée du fondu de sortie (secondes)
+            include_next_phrases: Nombre de phrases suivantes du même intervenant à inclure (0 = désactivé)
             
         Returns:
             Chemin du fichier audio généré
@@ -368,10 +423,21 @@ class PhraseSelector:
             start_ms = int(phrase.start * 1000)
             end_ms = int(phrase.end * 1000)
             
-            # Ajouter un peu de contexte (padding)
+            # Ajouter un peu de contexte au début (padding)
             padding_ms = 100  # 0.1s de contexte
             start_ms = max(0, start_ms - padding_ms)
-            end_ms = min(len(source_audio), end_ms + padding_ms)
+            
+            # Étendre jusqu'à la fin des phrases suivantes si demandé
+            if include_next_phrases > 0:
+                extended_end = self._get_next_phrase_same_speaker(phrase, include_next_phrases)
+                if extended_end:
+                    end_ms = int(extended_end * 1000)
+                    duration_added = extended_end - phrase.end
+                    print(f"      ↪️  +{include_next_phrases} phrase(s) suivante(s) du même intervenant (+{duration_added:.1f}s)")
+                else:
+                    end_ms = min(len(source_audio), end_ms + padding_ms)
+            else:
+                end_ms = min(len(source_audio), end_ms + padding_ms)
             
             phrase_audio = source_audio[start_ms:end_ms]
             

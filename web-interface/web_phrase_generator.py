@@ -68,13 +68,14 @@ class WebPhraseGenerator:
         # Pas besoin de LoveTypeAnalyzer - les données sont déjà dans les JSON
         self.love_analyzer = None
     
-    def generate_web_phrases(self, keywords: List[str], num_phrases: int = 3) -> WebPhraseResult:
+    def generate_web_phrases(self, keywords: List[str], num_phrases: int = 3, include_next: int = 0) -> WebPhraseResult:
         """
         Génère des phrases pour l'interface web
         
         Args:
             keywords: Liste des mots-clés
             num_phrases: Nombre de phrases à générer
+            include_next: Nombre de phrases suivantes du même intervenant à inclure (0 = désactivé)
             
         Returns:
             WebPhraseResult avec toutes les infos pour l'interface
@@ -119,10 +120,11 @@ class WebPhraseGenerator:
                 fade_in_duration=0.1,
                 fade_out_duration=0.1,
                 normalize="rms",
-                keywords=keywords
+                keywords=keywords,
+                include_next_phrases=include_next  # Inclure N phrases suivantes du même intervenant
             )
             
-            # Calculer la durée totale
+            # Calculer la durée totale (base)
             total_duration = sum(phrase.end - phrase.start for phrase in selected_phrases)
             total_duration += len(selected_phrases) * 1.0  # Gaps
             
@@ -253,17 +255,25 @@ def main():
         result = WebPhraseResult(
             success=False,
             phrases=[],
-            error="Usage: web_phrase_generator.py <num_phrases> <keyword1> [keyword2] ..."
+            error="Usage: web_phrase_generator.py <num_phrases> <keyword1> [keyword2] ... [--include-next=<N>]"
         )
         print(json.dumps(asdict(result), ensure_ascii=False, indent=2))
         return
     
     try:
         num_phrases = int(sys.argv[1])
-        keywords = sys.argv[2:]
+        
+        # Extraire include_next si présent
+        include_next = 0
+        keywords = []
+        for arg in sys.argv[2:]:
+            if arg.startswith('--include-next='):
+                include_next = int(arg.split('=')[1])
+            else:
+                keywords.append(arg)
         
         generator = WebPhraseGenerator()
-        result = generator.generate_web_phrases(keywords, num_phrases)
+        result = generator.generate_web_phrases(keywords, num_phrases, include_next)
         
         # Sortie JSON pour Node.js avec encoding strict UTF-8
         result_json = json.dumps(asdict(result), ensure_ascii=False, indent=None, separators=(',', ':'))
