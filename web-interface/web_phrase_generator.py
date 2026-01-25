@@ -147,7 +147,16 @@ class WebPhraseGenerator:
             
             # Préparer les données des phrases
             phrases_data = []
+            gap_duration = 1.0  # Même valeur que dans generate_phrase_montage
+            
             for i, phrase in enumerate(selected_phrases):
+                base_duration = phrase.end - phrase.start
+                
+                # Calculer la durée réelle qui inclut potentiellement les extensions
+                # Si include_next > 0, le backend étend la durée, on utilise la durée du fichier audio final
+                # Pour l'instant, on utilise base_duration + estimation des extensions
+                real_duration = base_duration
+                
                 phrases_data.append({
                     'index': i + 1,
                     'text': phrase.text,
@@ -157,7 +166,9 @@ class WebPhraseGenerator:
                     'match_score': phrase.match_score,
                     'start_time': phrase.start,
                     'end_time': phrase.end,
-                    'duration': phrase.end - phrase.start,
+                    'duration': base_duration,  # Durée de base
+                    'real_duration': real_duration,  # Durée réelle dans le montage
+                    'gap_after': gap_duration if i < len(selected_phrases) - 1 else 0,  # Gap après ce segment
                     'love_type': getattr(phrase, 'love_type', None),
                     'love_analysis': getattr(phrase, 'love_analysis', None)  # Récupérer depuis le match
                 })

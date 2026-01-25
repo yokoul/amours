@@ -180,6 +180,8 @@ class PoeticInterface {
         this.archive = [];
         this.archiveIsOpen = false;
         this.spider = null;  // Visualisation sémantique
+        this.segments = null;  // Timeline des segments audio
+        this.totalDuration = 0;
         
         this.init();
     }
@@ -649,23 +651,31 @@ class PoeticInterface {
         
         this.audioElement = new Audio(data.audioFile);
         
+        // Générer la timeline des segments si on a les données de phrases
+        if (data.phrases && data.phrases.length > 0) {
+            this.generateSegmentTimeline(data.phrases);
+        }
+        
         // Événements audio
         this.audioElement.addEventListener('loadedmetadata', () => {
-            this.generateWaveform();
+            // Timeline déjà générée avec les données réelles
         });
         
         this.audioElement.addEventListener('timeupdate', () => {
-            // La progression est maintenant affichée par le waveform
+            // La progression est maintenant affichée par la timeline des segments
             if (this.audioElement && !this.audioElement.paused) {
-                this.animateWaveform();
+                this.animateSegmentTimeline();
             }
         });
         
         this.audioElement.addEventListener('ended', () => {
             playBtn.innerHTML = '<span class="play-symbol">▶</span>';
-            // Réinitialiser le waveform
-            if (this.waveBars) {
-                this.waveBars.forEach(bar => bar.classList.remove('active'));
+            // Réinitialiser la timeline
+            if (this.segments) {
+                this.segments.forEach(seg => seg.element.classList.remove('active', 'played'));
+            }
+            if (this.timelineCursor) {
+                this.timelineCursor.style.left = '0%';
             }
         });
         
@@ -846,37 +856,103 @@ class PoeticInterface {
         }
     }
     
-    generateWaveform() {
+    generateSegmentTimeline(phrases) {
         const waveform = document.getElementById('waveform');
         waveform.innerHTML = '';
         
-        // Créer des barres fixes qui s'animeront pendant la lecture
-        this.waveBars = [];
-        const numBars = 60;
+        if (!phrases || phrases.length === 0) return;
         
-        for (let i = 0; i < numBars; i++) {
-            const bar = document.createElement('div');
-            bar.className = 'wave-bar';
-            // Variation de hauteur basée sur une courbe sinusoïdale
-            const baseHeight = 30 + Math.sin(i / 8) * 40 + Math.random() * 30;
-            bar.style.height = `${baseHeight}%`;
-            bar.setAttribute('data-base-height', baseHeight);
-            waveform.appendChild(bar);
-            this.waveBars.push(bar);
-        }
+        // Calculer la durée totale (segments + gaps)
+        const totalDuration = phrases.reduce((sum, p) => {
+            return sum + (p.real_duration || p.duration) + (p.gap_after || 0);
+        }, 0);
+        
+        this.segments = [];
+        let currentTime = 0;
+        
+        // Créer le conteneur de la timeline avec le curseur
+        const timelineContainer = document.createElement('div');
+        timelineContainer.className = 'timeline-container';
+        
+        const timelineTrack = document.createElement('div');
+        timelineTrack.className = 'timeline-track';
+        
+        phrases.forEach((phrase, index) => {
+            const duration = phrase.real_duration || phrase.duration;
+            const segment = document.createElement('div');
+            segment.className = 'timeline-segment';
+            
+            // Largeur proportionnelle à la durée
+            const widthPercent = (duration / totalDuration) * 100;
+            segment.style.width = `${widthPercent}%`;
+            segment.setAttribute('data-duration', duration.toFixed(1));
+            segment.setAttribute('data-start', currentTime.toFixed(1));
+            segment.setAttribute('data-end', (currentTime + duration).toFixed(1));
+            segment.setAttribute('data-index', index);
+            
+            // Ajouter un label avec le numéro et la durée
+            const label = document.createElement('div');
+            label.className = 'segment-label';
+            label.textContent = `${index + 1} · ${duration.toFixed(1)}s`;
+            segment.appendChild(label);
+            
+            timelineTrack.appendChild(segment);
+            this.segments.push({
+                element: segment,
+                start: currentTime,
+                end: currentTime + duration,
+                duration: duration
+            });
+            
+            currentTime += duration;
+            
+            // Ajouter un gap visuel sauf pour le dernier segment
+            if (phrase.gap_after && phrase.gap_after > 0) {
+                const gap = document.createElement('div');
+                gap.className = 'timeline-gap';
+                const gapPercent = (phrase.gap_after / totalDuration) * 100;
+                gap.style.width = `${gapPercent}%`;
+                timelineTrack.appendChild(gap);
+                
+                currentTime += phrase.gap_after;
+            }
+        });
+        
+        // Ajouter le curseur de progression
+        const cursor = document.createElement('div');
+        cursor.className = 'timeline-cursor';
+        cursor.id = 'timeline-cursor';
+        timelineContainer.appendChild(timelineTrack);
+        timelineContainer.appendChild(cursor);
+        
+        waveform.appendChild(timelineContainer);
+        
+        this.totalDuration = totalDuration;
+        this.timelineCursor = cursor;
     }
     
-    animateWaveform() {
-        if (!this.waveBars) return;
+    animateSegmentTimeline() {
+        if (!this.segments || !this.audioElement) return;
         
-        const progress = this.audioElement.currentTime / this.audioElement.duration;
-        const currentBar = Math.floor(progress * this.waveBars.length);
+        const currentTime = this.audioElement.currentTime;
+        const totalDuration = this.audioElement.duration;
         
-        this.waveBars.forEach((bar, i) => {
-            if (i === currentBar) {
-                bar.classList.add('active');
+        // Déplacer le curseur
+        if (this.timelineCursor && totalDuration > 0) {
+            const progressPercent = (currentTime / totalDuration) * 100;
+            this.timelineCursor.style.left = `${progressPercent}%`;
+        }
+        
+        // Mettre à jour les états des segments
+        this.segments.forEach((segment) => {
+            if (currentTime >= segment.start && currentTime <= segment.end) {
+                segment.element.classList.add('active');
+                segment.element.classList.remove('played');
+            } else if (currentTime > segment.end) {
+                segment.element.classList.add('played');
+                segment.element.classList.remove('active');
             } else {
-                bar.classList.remove('active');
+                segment.element.classList.remove('active', 'played');
             }
         });
     }
