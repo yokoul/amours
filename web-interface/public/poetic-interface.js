@@ -182,6 +182,8 @@ class PoeticInterface {
         this.spider = null;  // Visualisation sémantique
         this.segments = null;  // Timeline des segments audio
         this.totalDuration = 0;
+        this.karaokeData = null;  // Données pour le karaoké mot par mot
+        this.currentPhraseIndex = 0;
         
         this.init();
     }
@@ -639,8 +641,12 @@ class PoeticInterface {
         const phraseDisplay = document.getElementById('phrase-display');
         const playBtn = document.getElementById('play-btn');
         
-        // Afficher le texte de la phrase
-        phraseDisplay.textContent = data.phrase || 'Création poétique';
+        // Stocker les données pour le karaoké
+        this.karaokeData = data.phrases || [];
+        this.currentPhraseIndex = 0;
+        
+        // Afficher le texte initial avec structure pour karaoké
+        this.renderKaraokeText();
         phraseDisplay.style.opacity = '1';
         
         // Configuration du lecteur audio
@@ -662,9 +668,10 @@ class PoeticInterface {
         });
         
         this.audioElement.addEventListener('timeupdate', () => {
-            // La progression est maintenant affichée par la timeline des segments
+            // Animer la timeline des segments et le karaoké
             if (this.audioElement && !this.audioElement.paused) {
                 this.animateSegmentTimeline();
+                this.animateKaraoke();
             }
         });
         
@@ -929,6 +936,74 @@ class PoeticInterface {
         
         this.totalDuration = totalDuration;
         this.timelineCursor = cursor;
+    }
+    
+    renderKaraokeText() {
+        const phraseDisplay = document.getElementById('phrase-display');
+        phraseDisplay.innerHTML = '';
+        
+        if (!this.karaokeData || this.karaokeData.length === 0) {
+            phraseDisplay.textContent = 'Création poétique';
+            return;
+        }
+        
+        // Créer un conteneur pour chaque phrase
+        this.karaokeData.forEach((phrase, phraseIndex) => {
+            if (!phrase.words || phrase.words.length === 0) {
+                // Pas de données word-level, afficher le texte brut
+                const phraseSpan = document.createElement('span');
+                phraseSpan.className = 'phrase-text';
+                phraseSpan.textContent = phrase.text;
+                phraseDisplay.appendChild(phraseSpan);
+                
+                if (phraseIndex < this.karaokeData.length - 1) {
+                    const separator = document.createElement('span');
+                    separator.className = 'phrase-separator';
+                    separator.textContent = ' (...) ';
+                    phraseDisplay.appendChild(separator);
+                }
+            } else {
+                // Créer un span pour chaque mot avec timestamp
+                phrase.words.forEach((wordObj, wordIndex) => {
+                    const wordSpan = document.createElement('span');
+                    wordSpan.className = 'karaoke-word';
+                    wordSpan.textContent = wordObj.word;
+                    wordSpan.setAttribute('data-phrase', phraseIndex);
+                    wordSpan.setAttribute('data-word', wordIndex);
+                    wordSpan.setAttribute('data-start', wordObj.start);
+                    wordSpan.setAttribute('data-end', wordObj.end);
+                    phraseDisplay.appendChild(wordSpan);
+                });
+                
+                // Séparateur entre phrases
+                if (phraseIndex < this.karaokeData.length - 1) {
+                    const separator = document.createElement('span');
+                    separator.className = 'phrase-separator';
+                    separator.textContent = ' (...) ';
+                    phraseDisplay.appendChild(separator);
+                }
+            }
+        });
+    }
+    
+    animateKaraoke() {
+        if (!this.audioElement || !this.karaokeData) return;
+        
+        const currentTime = this.audioElement.currentTime;
+        const words = document.querySelectorAll('.karaoke-word');
+        
+        if (words.length === 0) return;
+        
+        words.forEach(word => {
+            const start = parseFloat(word.getAttribute('data-start'));
+            const end = parseFloat(word.getAttribute('data-end'));
+            
+            if (currentTime >= start && currentTime <= end) {
+                word.classList.add('active');
+            } else {
+                word.classList.remove('active');
+            }
+        });
     }
     
     animateSegmentTimeline() {

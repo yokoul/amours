@@ -609,6 +609,29 @@ body {
     align-items: center;
     justify-content: center;
     text-align: center;
+    flex-wrap: wrap;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.karaoke-word {
+    display: inline;
+    transition: all 0.1s ease;
+    padding: 2px 0;
+    white-space: pre;
+}
+
+.karaoke-word.active {
+    background: var(--black);
+    color: var(--white);
+    padding: 2px 4px;
+    border-radius: 2px;
+}
+
+.phrase-separator {
+    opacity: 0.5;
+    font-style: italic;
+    margin: 0 4px;
 }
 
 .semantic-data {

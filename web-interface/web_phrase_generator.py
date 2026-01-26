@@ -149,21 +149,55 @@ class WebPhraseGenerator:
             phrases_data = []
             gap_duration = 1.0  # Même valeur que dans generate_phrase_montage
             
+            # Calculer la position de début de chaque phrase dans le montage
+            montage_time = 0.0
+            
             for i, phrase in enumerate(selected_phrases):
                 base_duration = phrase.end - phrase.start
                 
                 # Calculer la durée réelle qui inclut les extensions (include_next)
                 real_duration = base_duration
+                extended_end = phrase.end
                 
                 if include_next > 0:
                     # Utiliser la même méthode que le backend pour calculer l'extension
-                    extended_end = self.selector._get_next_phrase_same_speaker(phrase, include_next)
-                    if extended_end:
+                    extended_end_calc = self.selector._get_next_phrase_same_speaker(phrase, include_next)
+                    if extended_end_calc:
+                        extended_end = extended_end_calc
                         real_duration = extended_end - phrase.start
+                
+                # Récupérer les timestamps mot par mot depuis les données de transcription
+                # Inclure TOUS les mots entre phrase.start et extended_end (incluant les extensions)
+                words_data = []
+                if phrase.file_name in self.selector.transcription_data:
+                    trans_data = self.selector.transcription_data[phrase.file_name]
+                    segments = trans_data['transcription']['segments']
+                    
+                    # Calculer l'offset pour ajuster les timestamps au montage
+                    offset = montage_time - phrase.start
+                    
+                    # Parcourir TOUS les segments pour trouver les mots dans l'intervalle [phrase.start, extended_end]
+                    for seg in segments:
+                        if 'words' in seg:
+                            for word_obj in seg['words']:
+                                word_start = word_obj['start']
+                                word_end = word_obj['end']
+                                
+                                # Inclure tous les mots dans l'intervalle étendu
+                                if word_start >= phrase.start and word_end <= extended_end:
+                                    words_data.append({
+                                        'word': word_obj['word'],
+                                        'start': word_start + offset,  # Ajuster au temps du montage
+                                        'end': word_end + offset       # Ajuster au temps du montage
+                                    })
+                
+                
+                # Construire le texte complet à partir des mots récupérés (incluant les extensions)
+                full_text = ''.join([w['word'] for w in words_data]) if words_data else phrase.text
                 
                 phrases_data.append({
                     'index': i + 1,
-                    'text': phrase.text,
+                    'text': full_text,  # Texte complet incluant les extensions
                     'speaker': phrase.speaker,
                     'file_name': phrase.file_name,
                     'keywords_found': phrase.keywords_found,
@@ -173,9 +207,15 @@ class WebPhraseGenerator:
                     'duration': base_duration,  # Durée de base
                     'real_duration': real_duration,  # Durée réelle dans le montage (avec extensions)
                     'gap_after': gap_duration if i < len(selected_phrases) - 1 else 0,  # Gap après ce segment
+                    'words': words_data,  # Timestamps mot par mot pour le karaoké
                     'love_type': getattr(phrase, 'love_type', None),
                     'love_analysis': getattr(phrase, 'love_analysis', None)  # Récupérer depuis le match
                 })
+                
+                # Avancer le temps du montage pour la prochaine phrase
+                montage_time += real_duration
+                if i < len(selected_phrases) - 1:
+                    montage_time += gap_duration
             
             # Calculer l'analyse sémantique globale (moyenne des phrases)
             semantic_analysis = None
