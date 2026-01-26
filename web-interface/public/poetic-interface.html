@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Amour • Interface Poétique</title>
+    <link rel="stylesheet" href="poetic-style.css?v=20260126">
+    <meta name="theme-color" content="#000000">
+    <meta http-equiv="cache-control" content="no-cache">
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="expires" content="0">
+</head>
+<body>
+    <!-- ÉTAT 1: CONTEMPLATION -->
+    <main id="app" data-state="contemplation">
+        
+        <!-- Zone centrale d'interaction -->
+        <section class="stage" id="main-stage">
+            
+            <!-- Point d'entrée -->
+            <div class="entry-point" id="entry-point" role="button" tabindex="0" aria-label="Commencer l'expérience">
+                <div class="pulse-circle"></div>
+                <p class="invitation">toucher pour commencer</p>
+            </div>
+            
+            <!-- Zone de mots (masquée initialement) -->
+            <div class="word-space" id="word-space">
+                <div class="word-cloud" id="word-cloud">
+                    <!-- Mots générés dynamiquement -->
+                </div>
+                <div class="selection-area" id="selection-area">
+                    <div class="selected-words" id="selected-words" aria-live="polite"></div>
+                    <button class="generate-btn" id="generate-btn" aria-label="Créer une phrase">
+                        <span>créer</span>
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Interface audio (masquée initialement) -->
+            <div class="audio-space" id="audio-space">
+                <div class="audio-player" id="audio-player">
+                    <div class="waveform" id="waveform" aria-hidden="true"></div>
+                    <div class="controls">
+                        <button class="play-btn" id="play-btn" aria-label="Lecture">
+                            <span class="play-symbol">▶</span>
+                        </button>
+                        <div class="progress" id="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+                            <div class="progress-bar" id="progress-bar"></div>
+                        </div>
+                    </div>
+                    <div class="phrase-display" id="phrase-display" aria-live="polite"></div>
+                    <div class="semantic-data" id="semantic-data"></div>
+                </div>
+            </div>
+            
+            <!-- Visualisation sémantique (toujours dans le DOM) -->
+            <canvas id="spider-canvas" class="spider-viz"></canvas>
+            
+        </section>
+        
+        <!-- Navigation d'état -->
+        <nav class="state-nav" id="state-nav">
+            <button class="nav-btn" data-action="restart" aria-label="Recommencer">
+                <span>↺</span>
+            </button>
+            <button class="nav-btn" data-action="archive" aria-label="Archive">
+                <span>≡</span>
+            </button>
+        </nav>
+        
+        <!-- Boutons de contrôle (thème, karaoké) -->
+        <button class="theme-toggle-btn" id="theme-toggle-btn" aria-label="Changer le thème">
+            <span>◐</span>
+        </button>
+        <button id="karaoke-toggle-btn" aria-label="Activer/Désactiver le karaoké">
+            <span>🎤</span>
+        </button>
+        
+        <!-- Archive (panneau coulissant) -->
+        <aside class="archive" id="archive">
+            <div class="archive-drag-handle"></div>
+            <header class="archive-header">
+                <h2>mémoire</h2>
+                <button class="close-archive" id="close-archive" aria-label="Fermer">×</button>
+            </header>
+            <div class="archive-list" id="archive-list">
+                <!-- Historique généré dynamiquement -->
+            </div>
+        </aside>
+        
+    </main>
+    
+    <!-- Scripts -->
+    <script src="spider-minimal.js?v=2"></script>
+    <script src="poetic-interface.js?v=20260124"></script>
+</body>
+</html>

@@ -5,11 +5,13 @@
 
 echo "🎭 Démarrage du serveur spectacle d'amour..."
 
-# Variables de configuration
+# Variables de configuration - chemins relatifs
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
 PORT=3000
 WEBSOCKET_PORT=8080
-INTERFACE_DIR="/Users/yan/synoul415/devel/texts_AA/web-interface"
-PYTHON_ENV="/Users/yan/synoul415/devel/texts_AA/.venv/bin/python"
+INTERFACE_DIR="$SCRIPT_DIR"
+PYTHON_ENV="$PROJECT_ROOT/.venv/bin/python"
 
 # Vérifier que nous sommes dans le bon répertoire
 if [ ! -d "$INTERFACE_DIR" ]; then

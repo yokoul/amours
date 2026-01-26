@@ -13,8 +13,10 @@ class PoeticServer {
     constructor() {
         this.app = express();
         this.port = 3000;
-        this.pythonPath = '/Users/yan/synoul415/devel/texts_AA/.venv/bin/python';
-        this.projectRoot = '/Users/yan/synoul415/devel/texts_AA';
+        
+        // Chemins relatifs calculés automatiquement
+        this.projectRoot = path.resolve(__dirname, '..');
+        this.pythonPath = path.join(this.projectRoot, '.venv', 'bin', 'python');
         
         this.setup();
     }
