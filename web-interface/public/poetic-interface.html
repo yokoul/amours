@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Amour • Interface Poétique</title>
     <link rel="stylesheet" href="poetic-style.css?v=20260126">
+    <link rel="stylesheet" href="recording-interface.css?v=20260126">
     <meta name="theme-color" content="#000000">
     <meta http-equiv="cache-control" content="no-cache">
     <meta http-equiv="pragma" content="no-cache">
@@ -63,6 +64,9 @@
             <button class="nav-btn" data-action="restart" aria-label="Recommencer">
                 <span>↺</span>
             </button>
+            <button class="nav-btn" data-action="record" aria-label="Enregistrer">
+                <span>🎙️</span>
+            </button>
             <button class="nav-btn" data-action="archive" aria-label="Archive">
                 <span>≡</span>
             </button>
@@ -91,6 +95,8 @@
     </main>
     
     <!-- Scripts -->
+    <script src="audio-recorder.js?v=20260126"></script>
+    <script src="recording-interface.js?v=20260126"></script>
     <script src="spider-minimal.js?v=2"></script>
     <script src="poetic-interface.js?v=20260124"></script>
 </body>

@@ -863,11 +863,11 @@ body {
     transform: scale(0.95);
 }
 
-/* Bouton karaoké (à côté du thème) */
+/* Bouton karaoké (empilé au-dessus du thème) */
 #karaoke-toggle-btn {
     position: fixed;
-    bottom: var(--space-m);
-    right: calc(var(--space-m) + 50px); /* Décalé à gauche du bouton thème */
+    bottom: calc(var(--space-m) + 50px); /* Au-dessus du bouton thème */
+    right: var(--space-m);
     width: 40px;
     height: 40px;
     border: 1px solid var(--grey-medium);

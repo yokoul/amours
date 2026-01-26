@@ -7,7 +7,10 @@ const express = require('express');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs').promises;
+const fsSync = require('fs');
 const cors = require('cors');
+const multer = require('multer');
+const crypto = require('crypto');
 
 class PoeticServer {
     constructor() {
@@ -17,6 +20,9 @@ class PoeticServer {
         // Chemins relatifs calculés automatiquement
         this.projectRoot = path.resolve(__dirname, '..');
         this.pythonPath = path.join(this.projectRoot, '.venv', 'bin', 'python');
+        
+        // Stockage des jobs de traitement
+        this.processingJobs = new Map();
         
         this.setup();
     }
@@ -85,6 +91,26 @@ class PoeticServer {
             }
         });
         
+        // API pour upload de contributions audio
+        this.app.post('/api/upload-contribution', this.uploadMiddleware(), async (req, res) => {
+            try {
+                await this.handleAudioContribution(req, res);
+            } catch (error) {
+                console.error('Erreur upload:', error);
+                res.status(500).json({ error: 'Erreur lors de l\'upload' });
+            }
+        });
+        
+        // API pour vérifier le statut de traitement
+        this.app.get('/api/processing-status/:jobId', async (req, res) => {
+            try {
+                const status = await this.getProcessingStatus(req.params.jobId);
+                res.json(status);
+            } catch (error) {
+                res.status(500).json({ error: 'Erreur récupération statut' });
+            }
+        });
+        
         // Servir les fichiers audio générés
         this.app.use('/audio', express.static(path.join(this.projectRoot, 'output_mix_play')));
         
@@ -124,7 +150,9 @@ class PoeticServer {
             'dire', 'parler', 'voir', 'regarder', 'entendre',
             'écouter', 'sentir', 'toucher', 'venir', 'partir',
             'rester', 'tomber', 'marcher', 'devenir', 'polyamour',
-            'trahison', 'fidélité', 'odeur', 'couleur', 'chant'
+            'trahison', 'fidélité', 'odeur', 'couleur', 'chant',
+            'musique', 'silence', 'nature', 'mer', 'ciel',
+            'étoile', 'lune', 'soleil', 'chien', 'chat', 'fleur'
         ];
         
         // Mélanger aléatoirement
@@ -250,6 +278,407 @@ class PoeticServer {
                     reject(e);
                 }
             });
+        });
+    }
+    
+    /* ===========================
+       MIDDLEWARE UPLOAD
+       =========================== */
+    
+    uploadMiddleware() {
+        const storage = multer.diskStorage({
+            destination: async (req, file, cb) => {
+                const uploadDir = path.join(this.projectRoot, 'audio', 'contributions');
+                await fs.mkdir(uploadDir, { recursive: true });
+                cb(null, uploadDir);
+            },
+            filename: (req, file, cb) => {
+                // Générer nom unique
+                const uniqueId = crypto.randomBytes(8).toString('hex');
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const ext = path.extname(file.originalname) || '.webm';
+                cb(null, `contribution_${timestamp}_${uniqueId}${ext}`);
+            }
+        });
+        
+        return multer({ 
+            storage,
+            limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB max
+            fileFilter: (req, file, cb) => {
+                const allowedTypes = ['audio/webm', 'audio/wav', 'audio/mp3', 'audio/mpeg', 'audio/ogg', 'audio/mp4'];
+                if (allowedTypes.includes(file.mimetype) || file.mimetype.startsWith('audio/')) {
+                    cb(null, true);
+                } else {
+                    cb(new Error('Type de fichier non supporté'));
+                }
+            }
+        }).single('audio');
+    }
+    
+    /* ===========================
+       TRAITEMENT CONTRIBUTIONS AUDIO
+       =========================== */
+    
+    async handleAudioContribution(req, res) {
+        if (!req.file) {
+            return res.status(400).json({ error: 'Aucun fichier audio fourni' });
+        }
+        
+        const audioPath = req.file.path;
+        const metadata = req.body.metadata ? JSON.parse(req.body.metadata) : {};
+        
+        console.log('🎤 Nouvelle contribution reçue:', {
+            file: req.file.filename,
+            size: `${(req.file.size / 1024).toFixed(2)} KB`,
+            duration: metadata.duration,
+            mimetype: req.file.mimetype
+        });
+        
+        // Créer un job ID unique
+        const jobId = crypto.randomBytes(16).toString('hex');
+        
+        // Initialiser le job
+        this.processingJobs.set(jobId, {
+            status: 'queued',
+            audioFile: req.file.filename,
+            audioPath: audioPath,
+            metadata: metadata,
+            startTime: Date.now(),
+            progress: {
+                step: 'upload',
+                message: 'Fichier reçu'
+            }
+        });
+        
+        // Répondre immédiatement avec le job ID
+        res.json({
+            success: true,
+            jobId: jobId,
+            message: 'Contribution reçue, traitement en cours...',
+            audioFile: req.file.filename
+        });
+        
+        // Lancer le traitement en arrière-plan
+        this.processAudioContribution(jobId).catch(error => {
+            console.error('❌ Erreur traitement contribution:', error);
+            const job = this.processingJobs.get(jobId);
+            if (job) {
+                job.status = 'error';
+                job.error = error.message;
+            }
+        });
+    }
+    
+    /* ===========================
+       PIPELINE DE TRAITEMENT
+       =========================== */
+    
+    async processAudioContribution(jobId) {
+        const job = this.processingJobs.get(jobId);
+        if (!job) return;
+        
+        try {
+            // Étape 1: Transcription
+            job.status = 'processing';
+            job.progress = { step: 'transcription', message: 'Transcription audio en cours...' };
+            console.log('📝 Transcription démarrée pour', job.audioFile);
+            
+            const transcriptionResult = await this.transcribeAudio(job.audioPath);
+            job.transcriptionFile = transcriptionResult.jsonFile;
+            
+            // Étape 2: Analyse sémantique
+            job.progress = { step: 'semantic', message: 'Analyse sémantique en cours...' };
+            console.log('❤️  Analyse sémantique démarrée');
+            
+            const semanticResult = await this.analyzeSemantics(transcriptionResult.jsonFile);
+            job.semanticFile = semanticResult.jsonFile;
+            
+            // Terminé
+            job.status = 'completed';
+            job.progress = { step: 'completed', message: 'Traitement terminé avec succès' };
+            job.completedTime = Date.now();
+            job.processingDuration = (job.completedTime - job.startTime) / 1000;
+            
+            console.log('✅ Contribution traitée avec succès:', {
+                jobId: jobId,
+                duration: `${job.processingDuration.toFixed(1)}s`,
+                transcription: path.basename(job.transcriptionFile),
+                semantic: path.basename(job.semanticFile)
+            });
+            
+        } catch (error) {
+            console.error('❌ Erreur traitement:', error);
+            job.status = 'error';
+            job.error = error.message;
+            job.progress = { step: 'error', message: error.message };
+        }
+    }
+    
+    /* ===========================
+       TRANSCRIPTION AUDIO
+       =========================== */
+    
+    async transcribeAudio(audioPath) {
+        return new Promise((resolve, reject) => {
+            const script = path.join(this.projectRoot, 'src', 'main_with_speakers.py');
+            
+            // Générer le chemin de sortie
+            const audioFilename = path.basename(audioPath, path.extname(audioPath));
+            const outputPath = path.join(
+                this.projectRoot, 
+                'output_transcription', 
+                `${audioFilename}_with_speakers_complete.json`
+            );
+            
+            const args = [
+                script,
+                '--input', audioPath,
+                '--output', outputPath,
+                '--model', 'medium',
+                '--format', 'json',
+                '--word-timestamps'
+            ];
+            
+            console.log('🎯 Commande transcription:', this.pythonPath, args.join(' '));
+            
+            const python = spawn(this.pythonPath, args, {
+                cwd: this.projectRoot,
+                env: { 
+                    ...process.env, 
+                    PYTHONPATH: this.projectRoot,
+                    PYTHONIOENCODING: 'utf-8'
+                }
+            });
+            
+            let output = '';
+            let error = '';
+            
+            python.stdout.on('data', (data) => {
+                const text = data.toString('utf8');
+                output += text;
+                console.log('📝', text.trim());
+            });
+            
+            python.stderr.on('data', (data) => {
+                const text = data.toString('utf8');
+                error += text;
+                console.log('⚠️', text.trim());
+            });
+            
+            python.on('close', (code) => {
+                if (code !== 0) {
+                    reject(new Error(`Transcription échouée: ${error}`));
+                    return;
+                }
+                
+                // Le fichier JSON est maintenant à l'emplacement spécifié
+                resolve({ jsonFile: outputPath, output });
+            });
+        });
+    }
+    
+    /* ===========================
+       ANALYSE SÉMANTIQUE
+       =========================== */
+    
+    async analyzeSemantics(jsonFile) {
+        return new Promise((resolve, reject) => {
+            const script = path.join(this.projectRoot, 'analyze_love.py');
+            
+            // Générer le chemin de sortie pour l'analyse
+            const baseFilename = path.basename(jsonFile, '.json');
+            const outputPath = path.join(
+                this.projectRoot, 
+                'output_semantic', 
+                `${baseFilename}_love_analysis.json`
+            );
+            
+            const args = [
+                script,
+                '--input', jsonFile,
+                '--output', outputPath,
+                '--threshold', '0.15',
+                '--semantic'
+            ];
+            
+            console.log('🎯 Commande analyse:', this.pythonPath, args.join(' '));
+            
+            const python = spawn(this.pythonPath, args, {
+                cwd: this.projectRoot,
+                env: { 
+                    ...process.env, 
+                    PYTHONPATH: this.projectRoot,
+                    PYTHONIOENCODING: 'utf-8'
+                }
+            });
+            
+            let output = '';
+            let error = '';
+            
+            python.stdout.on('data', (data) => {
+                const text = data.toString('utf8');
+                output += text;
+                console.log('❤️', text.trim());
+            });
+            
+            python.stderr.on('data', (data) => {
+                const text = data.toString('utf8');
+                error += text;
+                console.log('⚠️', text.trim());
+            });
+            
+            python.on('close', (code) => {
+                if (code !== 0) {
+                    reject(new Error(`Analyse sémantique échouée: ${error}`));
+                    return;
+                }
+                
+                // Le script crée un répertoire avec le nom du fichier, puis met le JSON dedans
+                // Le nom du fichier dans le répertoire utilise le baseFilename sans le suffixe _complete
+                const cleanBasename = baseFilename.replace(/_complete$/, '');
+                const actualJsonPath = path.join(
+                    outputPath,
+                    `${cleanBasename}_love_analysis_love_analysis.json`
+                );
+                
+                resolve({ jsonFile: actualJsonPath, output });
+            });
+        });
+    }
+    
+    /* ===========================
+       STATUT DE TRAITEMENT
+       =========================== */
+    
+    async getProcessingStatus(jobId) {
+        const job = this.processingJobs.get(jobId);
+        
+        if (!job) {
+            return { error: 'Job non trouvé' };
+        }
+        
+        const response = {
+            jobId: jobId,
+            status: job.status,
+            progress: job.progress,
+            audioFile: job.audioFile
+        };
+        
+        if (job.status === 'completed') {
+            response.transcriptionFile = path.basename(job.transcriptionFile);
+            response.semanticFile = path.basename(job.semanticFile);
+            response.processingDuration = job.processingDuration;
+            
+            // Lire le contenu de la transcription
+            try {
+                const transcriptionData = JSON.parse(fsSync.readFileSync(job.transcriptionFile, 'utf-8'));
+                response.transcriptionText = transcriptionData.transcription?.text || transcriptionData.text || '';
+                response.words = transcriptionData.transcription?.words || transcriptionData.words || [];
+            } catch (err) {
+                console.error('❌ Erreur lecture transcription:', err);
+            }
+            
+            // Lire le contenu de l'analyse sémantique
+            try {
+                const semanticData = JSON.parse(fsSync.readFileSync(job.semanticFile, 'utf-8'));
+                response.semanticAnalysis = semanticData;
+            } catch (err) {
+                console.error('❌ Erreur lecture analyse:', err);
+            }
+        }
+        
+        if (job.status === 'error') {
+            response.error = job.error;
+        }
+        
+        return response;
+    }
+    
+    /* ===========================
+       MIDDLEWARE UPLOAD
+       =========================== */
+    
+    uploadMiddleware() {
+        const storage = multer.diskStorage({
+            destination: async (req, file, cb) => {
+                const uploadDir = path.join(this.projectRoot, 'audio', 'contributions');
+                await fs.mkdir(uploadDir, { recursive: true });
+                cb(null, uploadDir);
+            },
+            filename: (req, file, cb) => {
+                // Générer nom unique
+                const uniqueId = crypto.randomBytes(8).toString('hex');
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+                const ext = path.extname(file.originalname) || '.webm';
+                cb(null, `contribution_${timestamp}_${uniqueId}${ext}`);
+            }
+        });
+        
+        return multer({ 
+            storage,
+            limits: { fileSize: 50 * 1024 * 1024 }, // 50 MB max
+            fileFilter: (req, file, cb) => {
+                const allowedTypes = ['audio/webm', 'audio/wav', 'audio/mp3', 'audio/mpeg', 'audio/ogg', 'audio/mp4'];
+                if (allowedTypes.includes(file.mimetype) || file.mimetype.startsWith('audio/')) {
+                    cb(null, true);
+                } else {
+                    cb(new Error('Type de fichier non supporté'));
+                }
+            }
+        }).single('audio');
+    }
+    
+    /* ===========================
+       TRAITEMENT CONTRIBUTIONS AUDIO
+       =========================== */
+    
+    async handleAudioContribution(req, res) {
+        if (!req.file) {
+            return res.status(400).json({ error: 'Aucun fichier audio fourni' });
+        }
+        
+        const audioPath = req.file.path;
+        const metadata = req.body.metadata ? JSON.parse(req.body.metadata) : {};
+        
+        console.log('🎤 Nouvelle contribution reçue:', {
+            file: req.file.filename,
+            size: `${(req.file.size / 1024).toFixed(2)} KB`,
+            duration: metadata.duration,
+            mimetype: req.file.mimetype
+        });
+        
+        // Créer un job ID unique
+        const jobId = crypto.randomBytes(16).toString('hex');
+        
+        // Initialiser le job
+        this.processingJobs.set(jobId, {
+            status: 'queued',
+            audioFile: req.file.filename,
+            audioPath: audioPath,
+            metadata: metadata,
+            startTime: Date.now(),
+            progress: {
+                step: 'upload',
+                message: 'Fichier reçu'
+            }
+        });
+        
+        // Répondre immédiatement avec le job ID
+        res.json({
+            success: true,
+            jobId: jobId,
+            message: 'Contribution reçue, traitement en cours...',
+            audioFile: req.file.filename
+        });
+        
+        // Lancer le traitement en arrière-plan
+        this.processAudioContribution(jobId).catch(error => {
+            console.error('❌ Erreur traitement contribution:', error);
+            const job = this.processingJobs.get(jobId);
+            if (job) {
+                job.status = 'error';
+                job.error = error.message;
+            }
         });
     }
     

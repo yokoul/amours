@@ -1,0 +1,641 @@
+/* ===========================
+   STYLES INTERFACE D'ENREGISTREMENT
+   Style minimaliste noir & blanc
+   =========================== */
+
+.recording-interface {
+    display: none;
+}
+
+.recording-interface.active {
+    display: block;
+}
+
+.recording-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: var(--overlay-bg);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: fadeIn 0.8s ease-out;
+    transition: background-color 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.recording-panel {
+    background: transparent;
+    border: 1px solid var(--grey-medium);
+    width: 90%;
+    max-width: 500px;
+    padding: var(--space-m);
+    position: relative;
+    animation: slideUp 0.8s ease-out;
+}
+
+@keyframes slideUp {
+    from {
+        transform: translateY(30px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.recording-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--space-m);
+    border-bottom: 1px solid var(--grey-medium);
+    padding-bottom: var(--space-s);
+}
+
+.recording-header h2 {
+    margin: 0;
+    font-size: 1.2rem;
+    font-weight: 300;
+    letter-spacing: 2px;
+    text-transform: lowercase;
+    color: var(--black);
+}
+
+.close-recording {
+    background: none;
+    border: 1px solid var(--grey-medium);
+    font-size: 1.5rem;
+    color: var(--black);
+    cursor: pointer;
+    padding: 0;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.5;
+    transition: all 0.3s ease;
+    border-radius: 50%;
+}
+
+.close-recording:hover {
+    opacity: 1;
+    border-color: var(--black);
+    transform: scale(1.1);
+}
+
+.close-recording:active {
+    transform: scale(0.95);
+}
+
+/* ===========================
+   ÉTATS D'ENREGISTREMENT
+   =========================== */
+
+.recording-state > div {
+    display: none;
+}
+
+.recording-state[data-state="ready"] .recording-ready {
+    display: block;
+}
+
+.recording-state[data-state="recording"] .recording-active {
+    display: block;
+}
+
+.recording-state[data-state="preview"] .recording-preview {
+    display: block;
+}
+
+.recording-state[data-state="uploading"] .recording-upload {
+    display: block;
+}
+
+.recording-state[data-state="processing"] .recording-processing {
+    display: block;
+}
+
+.recording-state[data-state="success"] .recording-success {
+    display: block;
+}
+
+.recording-state[data-state="error"] .recording-error {
+    display: block;
+}
+
+/* ===========================
+   ÉTAT INITIAL (READY)
+   =========================== */
+
+.recording-ready {
+    text-align: center;
+    padding: var(--space-l) 0;
+}
+
+.mic-icon {
+    font-size: 4rem;
+    margin-bottom: var(--space-m);
+    opacity: 0.7;
+    animation: breathe 3s ease-in-out infinite;
+}
+
+@keyframes breathe {
+    0%, 100% { transform: scale(1); opacity: 0.7; }
+    50% { transform: scale(1.05); opacity: 1; }
+}
+
+.instruction {
+    font-size: 1rem;
+    margin-bottom: var(--space-l);
+    color: var(--grey-dark);
+    font-weight: 300;
+    letter-spacing: 0.5px;
+}
+
+.record-start-btn {
+    background: transparent;
+    color: var(--black);
+    border: 2px solid var(--black);
+    padding: var(--space-s) var(--space-l);
+    font-size: 1rem;
+    font-weight: 300;
+    letter-spacing: 2px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-transform: lowercase;
+}
+
+.record-start-btn:hover {
+    background: var(--black);
+    color: var(--white);
+    transform: translateY(-2px);
+}
+
+.record-start-btn:active {
+    transform: translateY(0);
+}
+
+/* ===========================
+   ÉTAT ENREGISTREMENT
+   =========================== */
+
+.recording-active {
+    text-align: center;
+    padding: var(--space-l) 0;
+}
+
+.recording-indicator {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-s);
+    margin-bottom: var(--space-l);
+}
+
+.pulse-dot {
+    width: 12px;
+    height: 12px;
+    background: var(--black);
+    border-radius: 50%;
+    animation: pulseDot 1.5s ease-in-out infinite;
+}
+
+@keyframes pulseDot {
+    0%, 100% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.3); opacity: 0.5; }
+}
+
+.recording-timer {
+    font-size: 1.8rem;
+    font-weight: 300;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 2px;
+    color: var(--black);
+}
+
+.waveform-viz {
+    height: 60px;
+    background: transparent;
+    border: 1px solid var(--grey-medium);
+    margin-bottom: var(--space-l);
+    position: relative;
+    overflow: hidden;
+}
+
+.recording-controls {
+    display: flex;
+    gap: var(--space-s);
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.recording-controls button {
+    background: transparent;
+    color: var(--black);
+    border: 1px solid var(--grey-medium);
+    padding: var(--space-s) var(--space-m);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: var(--space-xs);
+    transition: all 0.3s ease;
+    font-size: 0.9rem;
+    letter-spacing: 1px;
+    font-weight: 300;
+}
+
+.recording-controls button:hover {
+    border-color: var(--black);
+    transform: translateY(-2px);
+}
+
+.recording-controls button:active {
+    transform: translateY(0);
+}
+
+.record-stop-btn {
+    border-color: var(--black) !important;
+}
+
+.record-stop-btn:hover {
+    background: var(--black) !important;
+    color: var(--white) !important;
+}
+
+/* ===========================
+   ÉTAT PREVIEW
+   =========================== */
+
+.recording-preview {
+    text-align: center;
+    padding: var(--space-m) 0;
+}
+
+.preview-info {
+    margin-bottom: var(--space-m);
+}
+
+.preview-info p {
+    margin: 0 0 var(--space-xs) 0;
+    color: var(--grey-dark);
+    font-weight: 300;
+    letter-spacing: 1px;
+}
+
+.preview-duration {
+    font-size: 1.5rem;
+    font-weight: 300;
+    letter-spacing: 2px;
+    color: var(--black);
+}
+
+.preview-player {
+    width: 100%;
+    margin-bottom: var(--space-l);
+    filter: grayscale(100%) contrast(150%);
+}
+
+.preview-actions {
+    display: flex;
+    gap: var(--space-s);
+    justify-content: center;
+}
+
+.preview-actions button {
+    flex: 1;
+    max-width: 200px;
+    padding: var(--space-s);
+    border: 1px solid var(--grey-medium);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-xs);
+    font-size: 0.9rem;
+    letter-spacing: 1px;
+    transition: all 0.3s ease;
+    background: transparent;
+    color: var(--black);
+    font-weight: 300;
+}
+
+.preview-retry-btn:hover {
+    border-color: var(--black);
+    transform: translateY(-2px);
+}
+
+.preview-upload-btn {
+    border-color: var(--black);
+}
+
+.preview-upload-btn:hover {
+    background: var(--black);
+    color: var(--white);
+    transform: translateY(-2px);
+}
+
+/* ===========================
+   ÉTAT UPLOAD & TRAITEMENT
+   =========================== */
+
+.recording-upload,
+.recording-processing {
+    text-align: center;
+    padding: var(--space-xl) 0;
+}
+
+.upload-progress,
+.processing-steps {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-m);
+}
+
+.spinner {
+    width: 40px;
+    height: 40px;
+    border: 2px solid var(--grey-light);
+    border-top-color: var(--black);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+#upload-status,
+.processing-message {
+    font-size: 1rem;
+    color: var(--grey-dark);
+    font-weight: 300;
+    letter-spacing: 1px;
+}
+
+.processing-steps {
+    flex-direction: row;
+    justify-content: space-around;
+    width: 100%;
+    margin-bottom: var(--space-l);
+}
+
+.step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-xs);
+    opacity: 0.3;
+    transition: opacity 0.5s ease;
+}
+
+.step[data-status="active"],
+.step[data-status="completed"] {
+    opacity: 1;
+}
+
+.step-icon {
+    font-size: 2rem;
+}
+
+.step-label {
+    font-size: 0.8rem;
+    color: var(--grey-dark);
+    letter-spacing: 1px;
+    font-weight: 300;
+}
+
+/* ===========================
+   ÉTAT SUCCÈS
+   =========================== */
+
+.recording-success {
+    text-align: center;
+    padding: var(--space-l) 0;
+}
+
+.success-icon {
+    width: 80px;
+    height: 80px;
+    background: transparent;
+    border: 2px solid var(--black);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 3rem;
+    margin: 0 auto var(--space-m);
+    animation: scaleIn 0.6s ease-out;
+}
+
+@keyframes scaleIn {
+    from {
+        transform: scale(0);
+        opacity: 0;
+    }
+    to {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.recording-success h3 {
+    margin: 0 0 var(--space-m) 0;
+    font-size: 1.2rem;
+    font-weight: 300;
+    letter-spacing: 2px;
+    color: var(--black);
+    text-transform: lowercase;
+}
+
+.success-message {
+    color: var(--grey-dark);
+    margin-bottom: var(--space-m);
+    font-weight: 300;
+    letter-spacing: 0.5px;
+}
+
+.success-details {
+    background: transparent;
+    border: 1px solid var(--grey-medium);
+    padding: var(--space-m);
+    margin-bottom: var(--space-m);
+    text-align: left;
+    max-height: 300px;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+.transcription-text,
+.semantic-analysis {
+    margin-bottom: var(--space-m);
+}
+
+.transcription-text:last-child,
+.semantic-analysis:last-child {
+    margin-bottom: 0;
+}
+
+.text-label {
+    font-size: 0.75rem;
+    color: var(--grey-medium);
+    text-transform: lowercase;
+    letter-spacing: 1px;
+    margin: 0 0 var(--space-xs) 0;
+    font-weight: 300;
+}
+
+.text-content {
+    font-size: 0.95rem;
+    color: var(--black);
+    line-height: 1.6;
+    margin: 0;
+    font-weight: 300;
+}
+
+.analysis-item {
+    font-size: 0.85rem;
+    color: var(--black);
+    margin: var(--space-xs) 0;
+    line-height: 1.5;
+}
+
+.item-label {
+    color: var(--grey-medium);
+    font-weight: 300;
+}
+
+.success-close-btn {
+    background: transparent;
+    color: var(--black);
+    border: 2px solid var(--black);
+    padding: var(--space-s) var(--space-l);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 0.9rem;
+    letter-spacing: 2px;
+    text-transform: lowercase;
+    font-weight: 300;
+}
+
+.success-close-btn:hover {
+    background: var(--black);
+    color: var(--white);
+    transform: translateY(-2px);
+}
+
+.success-close-btn:active {
+    transform: translateY(0);
+}
+
+/* ===========================
+   ÉTAT ERREUR
+   =========================== */
+
+.recording-error {
+    text-align: center;
+    padding: var(--space-l) 0;
+}
+
+.error-icon {
+    font-size: 4rem;
+    margin-bottom: var(--space-m);
+    color: var(--black);
+    opacity: 0.7;
+}
+
+.recording-error h3 {
+    margin: 0 0 var(--space-m) 0;
+    font-size: 1.2rem;
+    font-weight: 300;
+    color: var(--black);
+    letter-spacing: 2px;
+    text-transform: lowercase;
+}
+
+.error-message {
+    color: var(--grey-dark);
+    margin-bottom: var(--space-m);
+    font-weight: 300;
+    letter-spacing: 0.5px;
+}
+
+.error-retry-btn {
+    background: transparent;
+    color: var(--black);
+    border: 2px solid var(--black);
+    padding: var(--space-s) var(--space-l);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 0.9rem;
+    letter-spacing: 2px;
+    text-transform: lowercase;
+    font-weight: 300;
+}
+
+.error-retry-btn:hover {
+    background: var(--black);
+    color: var(--white);
+    transform: translateY(-2px);
+}
+
+.error-retry-btn:active {
+    transform: translateY(0);
+}
+
+/* ===========================
+   RESPONSIVE
+   =========================== */
+
+@media (max-width: 600px) {
+    .recording-panel {
+        width: 95%;
+        padding: var(--space-m);
+    }
+    
+    .recording-header h2 {
+        font-size: 1rem;
+    }
+    
+    .recording-controls {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .recording-controls button {
+        width: 100%;
+    }
+    
+    .preview-actions {
+        flex-direction: column;
+        width: 100%;
+    }
+    
+    .preview-actions button {
+        max-width: 100%;
+    }
+    
+    .processing-steps {
+        gap: var(--space-xs);
+    }
+    
+    .step-icon {
+        font-size: 1.5rem;
+    }
+    
+    .step-label {
+        font-size: 0.7rem;
+    }
+}

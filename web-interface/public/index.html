@@ -6,6 +6,7 @@
     <title>Amour • Interface Poétique</title>
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="stylesheet" href="poetic-style.css">
+    <link rel="stylesheet" href="recording-interface.css">
     <meta name="theme-color" content="#000000">
 </head>
 <body>
@@ -73,6 +74,7 @@
         <!-- Navigation d'état -->
         <nav class="state-nav" id="state-nav">
             <button class="nav-btn" data-action="restart">○</button>
+            <button class="nav-btn" data-action="record" title="Enregistrer une contribution">◉</button>
             <button class="nav-btn" data-action="archive">□</button>
         </nav>
         
@@ -96,6 +98,8 @@
     </main>
     
     <!-- Scripts -->
+    <script src="audio-recorder.js"></script>
+    <script src="recording-interface.js"></script>
     <script src="poetic-interface.js"></script>
 </body>
 </html>

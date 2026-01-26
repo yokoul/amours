@@ -1136,6 +1136,10 @@ class PoeticInterface {
                 this.setState('contemplation');
                 break;
                 
+            case 'record':
+                this.openRecordingInterface();
+                break;
+                
             case 'archive':
                 this.openArchive();
                 break;
@@ -1156,6 +1160,17 @@ class PoeticInterface {
         document.getElementById('selected-words').innerHTML = '';
         document.getElementById('phrase-display').innerHTML = '';
         document.getElementById('word-cloud').innerHTML = '';
+    }
+    
+    openRecordingInterface() {
+        this.hapticFeedback('medium');
+        
+        // Initialiser l'interface d'enregistrement si pas déjà fait
+        if (!window.recordingInterface) {
+            window.recordingInterface = new RecordingInterface();
+        }
+        
+        window.recordingInterface.open();
     }
     
     
