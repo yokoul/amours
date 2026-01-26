@@ -127,29 +127,22 @@ class PhraseSelector:
             # Stocker les données complètes pour pouvoir accéder aux phrases suivantes
             self.transcription_data[file_name] = data
             
-            # Construire le chemin audio relatif au projet, pas absolu depuis le JSON
-            # Le JSON peut contenir un chemin absolu spécifique à un système
-            json_audio_path = data['metadata'].get('path', '')
+            # Toujours construire le chemin audio relatif au projet
+            # Ne JAMAIS utiliser le chemin absolu du JSON (non portable)
+            audio_path = self.project_root / self.audio_dir / file_name
             
-            # Si le chemin du JSON existe et est accessible, l'utiliser
-            if json_audio_path and Path(json_audio_path).exists():
-                audio_path = Path(json_audio_path)
-            else:
-                # Sinon, reconstruire le chemin relatif depuis audio_dir
-                audio_path = self.project_root / self.audio_dir / file_name
-                
-                # Si le fichier n'existe pas directement, chercher dans les sous-dossiers
-                if not audio_path.exists():
-                    # Chercher dans tous les sous-dossiers d'audio/
-                    found = False
-                    for subdir in (self.project_root / self.audio_dir).rglob(file_name):
-                        if subdir.is_file():
-                            audio_path = subdir
-                            found = True
-                            break
-                    if not found:
-                        print(f"⚠️ Fichier audio introuvable: {file_name}")
-                        return
+            # Si le fichier n'existe pas directement, chercher dans les sous-dossiers
+            if not audio_path.exists():
+                # Chercher dans tous les sous-dossiers d'audio/
+                found = False
+                for subdir in (self.project_root / self.audio_dir).rglob(file_name):
+                    if subdir.is_file():
+                        audio_path = subdir
+                        found = True
+                        break
+                if not found:
+                    print(f"⚠️ Fichier audio introuvable: {file_name}")
+                    return
             
             # Utiliser directement les segments qui sont déjà des phrases
             for segment in data['transcription']['segments']:
