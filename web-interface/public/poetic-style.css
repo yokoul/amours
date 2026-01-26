@@ -863,6 +863,37 @@ body {
     transform: scale(0.95);
 }
 
+/* Bouton karaoké (à côté du thème) */
+#karaoke-toggle-btn {
+    position: fixed;
+    bottom: var(--space-m);
+    right: calc(var(--space-m) + 50px); /* Décalé à gauche du bouton thème */
+    width: 40px;
+    height: 40px;
+    border: 1px solid var(--grey-medium);
+    background: var(--white);
+    border-radius: 50%;
+    font-size: 18px;
+    cursor: pointer;
+    transition: var(--fast-transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 1;
+    color: var(--black);
+    z-index: 100;
+}
+
+#karaoke-toggle-btn:hover {
+    opacity: 1;
+    border-color: var(--black);
+    transform: scale(1.1);
+}
+
+#karaoke-toggle-btn:active {
+    transform: scale(0.95);
+}
+
 /* ===========================
    ARCHIVE (MÉMOIRE)
    =========================== */

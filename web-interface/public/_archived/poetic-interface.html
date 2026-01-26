@@ -4,9 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Amour • Interface Poétique</title>
-    <link rel="stylesheet" href="poetic-style.css?v=20260124">
+    <link rel="stylesheet" href="poetic-style.css?v=20260126">
     <meta name="theme-color" content="#000000">
     <meta http-equiv="cache-control" content="no-cache">
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="expires" content="0">
 </head>
 <body>
     <!-- ÉTAT 1: CONTEMPLATION -->
@@ -58,12 +60,6 @@
         
         <!-- Navigation d'état -->
         <nav class="state-nav" id="state-nav">
-            <button class="nav-btn" id="theme-toggle-btn" aria-label="Changer le thème">
-                <span>◐</span>
-            </button>
-            <button class="nav-btn" id="karaoke-toggle-btn" aria-label="Activer/Désactiver le karaoké">
-                <span>🎤</span>
-            </button>
             <button class="nav-btn" data-action="restart" aria-label="Recommencer">
                 <span>↺</span>
             </button>
@@ -71,6 +67,14 @@
                 <span>≡</span>
             </button>
         </nav>
+        
+        <!-- Boutons de contrôle (thème, karaoké) -->
+        <button class="theme-toggle-btn" id="theme-toggle-btn" aria-label="Changer le thème">
+            <span>◐</span>
+        </button>
+        <button id="karaoke-toggle-btn" aria-label="Activer/Désactiver le karaoké">
+            <span>🎤</span>
+        </button>
         
         <!-- Archive (panneau coulissant) -->
         <aside class="archive" id="archive">
