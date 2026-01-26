@@ -184,12 +184,14 @@ class PoeticInterface {
         this.totalDuration = 0;
         this.karaokeData = null;  // Données pour le karaoké mot par mot
         this.currentPhraseIndex = 0;
+        this.karaokeEnabled = true;  // Karaoké activé par défaut
         
         this.init();
     }
     
     init() {
         this.loadTheme();
+        this.loadKaraokePreference();
         this.bindEvents();
         this.setupGestures();
         this.loadArchive();
@@ -222,6 +224,32 @@ class PoeticInterface {
         }
         
         console.log(`🎨 Thème changé: ${newTheme}`);
+    }
+    
+    /* ===========================
+       GESTION DU KARAOKÉ
+       =========================== */
+    
+    loadKaraokePreference() {
+        // Charger la préférence karaoké depuis localStorage
+        const savedKaraoke = localStorage.getItem('karaokeEnabled');
+        this.karaokeEnabled = savedKaraoke !== 'false'; // Activé par défaut
+        this.updateKaraokeButton();
+    }
+    
+    toggleKaraoke() {
+        this.karaokeEnabled = !this.karaokeEnabled;
+        localStorage.setItem('karaokeEnabled', this.karaokeEnabled.toString());
+        this.updateKaraokeButton();
+        console.log(`🎤 Karaoké ${this.karaokeEnabled ? 'activé' : 'désactivé'}`);
+    }
+    
+    updateKaraokeButton() {
+        const btn = document.getElementById('karaoke-toggle-btn');
+        if (btn) {
+            btn.style.opacity = this.karaokeEnabled ? '1' : '0.5';
+            btn.setAttribute('aria-label', this.karaokeEnabled ? 'Désactiver le karaoké' : 'Activer le karaoké');
+        }
     }
     
     /* ===========================
@@ -311,6 +339,14 @@ class PoeticInterface {
                 this.handleNavigation(action);
             });
         });
+        
+        // Bouton toggle thème
+        const themeToggleBtn = document.getElementById('theme-toggle-btn');
+        themeToggleBtn?.addEventListener('click', () => this.toggleTheme());
+        
+        // Bouton toggle karaoké
+        const karaokeToggleBtn = document.getElementById('karaoke-toggle-btn');
+        karaokeToggleBtn?.addEventListener('click', () => this.toggleKaraoke());
         
         // Archive
         const archiveBtn = document.querySelector('[data-action="archive"]');
@@ -987,7 +1023,8 @@ class PoeticInterface {
     }
     
     animateKaraoke() {
-        if (!this.audioElement || !this.karaokeData) return;
+        // Ne pas animer si le karaoké est désactivé
+        if (!this.karaokeEnabled || !this.audioElement || !this.karaokeData) return;
         
         const currentTime = this.audioElement.currentTime;
         const words = document.querySelectorAll('.karaoke-word');
