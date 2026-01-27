@@ -20,13 +20,22 @@ cd web-interface
 # Installer les dépendances Node.js
 npm install
 
-# Lancer le serveur
-./start-server.sh
+# Lancer le serveur (HTTPS activé automatiquement)
+node poetic-server.js
 ```
 
 L'interface sera accessible sur:
-- Local: http://localhost:3000
-- Réseau: http://[IP-locale]:3000
+- Local: https://localhost:3000
+- Réseau: https://[IP-locale]:3000
+- mDNS: https://today.local:3000
+
+### 🔐 HTTPS & Microphone iOS
+
+Le serveur démarre automatiquement en **HTTPS** si les certificats SSL sont présents (requis pour le microphone sur iOS/Safari).
+
+**Première utilisation** : Les certificats sont auto-signés, vous devrez accepter l'avertissement de sécurité dans Safari.
+
+📖 Voir [HTTPS_SETUP.md](HTTPS_SETUP.md) pour la configuration complète
 
 ## 📱 Utilisation
 

@@ -4,6 +4,7 @@
    =========================== */
 
 const express = require('express');
+const https = require('https');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs').promises;
@@ -733,13 +734,51 @@ class PoeticServer {
        =========================== */
     
     start() {
-        this.app.listen(this.port, '0.0.0.0', () => {
-            console.log(`🎭 Interface poétique démarrée:`);
-            console.log(`   → http://localhost:${this.port}`);
-            console.log(`   → http://0.0.0.0:${this.port} (réseau)`);
-            console.log('');
-            console.log('🎪 Prêt pour la performance live');
-        });
+        // Vérifier si les certificats SSL existent
+        const sslKeyPath = path.join(__dirname, 'ssl', 'key.pem');
+        const sslCertPath = path.join(__dirname, 'ssl', 'cert.pem');
+        
+        const useSSL = fsSync.existsSync(sslKeyPath) && fsSync.existsSync(sslCertPath);
+        
+        if (useSSL) {
+            // Démarrer en HTTPS
+            const sslOptions = {
+                key: fsSync.readFileSync(sslKeyPath),
+                cert: fsSync.readFileSync(sslCertPath)
+            };
+            
+            https.createServer(sslOptions, this.app).listen(this.port, '0.0.0.0', () => {
+                console.log(`🎭 Interface poétique démarrée (HTTPS):`);
+                console.log(`   → https://localhost:${this.port}`);
+                
+                // Afficher l'IP locale pour accès mobile
+                const { networkInterfaces } = require('os');
+                const nets = networkInterfaces();
+                for (const name of Object.keys(nets)) {
+                    for (const net of nets[name]) {
+                        // Afficher IPv4 non-interne
+                        if (net.family === 'IPv4' && !net.internal) {
+                            console.log(`   → https://${net.address}:${this.port} (réseau local)`);
+                        }
+                    }
+                }
+                
+                console.log('');
+                console.log('📱 Pour iOS: acceptez le certificat auto-signé lors de la première connexion');
+                console.log('🎪 Prêt pour la performance live');
+            });
+        } else {
+            // Démarrer en HTTP (fallback)
+            this.app.listen(this.port, '0.0.0.0', () => {
+                console.log(`🎭 Interface poétique démarrée (HTTP):`);
+                console.log(`   → http://localhost:${this.port}`);
+                console.log(`   → http://0.0.0.0:${this.port} (réseau)`);
+                console.log('');
+                console.log('⚠️  Mode HTTP: le microphone ne fonctionnera pas sur iOS');
+                console.log('💡 Générez des certificats SSL pour activer HTTPS');
+                console.log('🎪 Prêt pour la performance live');
+            });
+        }
         
         // Gestion propre de l'arrêt
         process.on('SIGINT', () => {
