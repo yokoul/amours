@@ -616,16 +616,27 @@ body {
 
 .karaoke-word {
     display: inline;
-    transition: all 0.1s ease;
-    padding: 2px 0;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    padding: 0;
+    margin: 0;
     white-space: pre;
+    opacity: 0.65;
+    position: relative;
+    letter-spacing: 0;
 }
 
 .karaoke-word.active {
-    background: var(--black);
-    color: var(--white);
-    padding: 2px 4px;
-    border-radius: 2px;
+    opacity: 1;
+    font-weight: 400;
+    letter-spacing: 0.3px;
+    text-shadow: 0 0 20px rgba(0, 0, 0, 0.3),
+                 0 0 40px rgba(0, 0, 0, 0.15);
+}
+
+/* Thème sombre - adaptation du glow */
+[data-theme="dark"] .karaoke-word.active {
+    text-shadow: 0 0 20px rgba(255, 255, 255, 0.4),
+                 0 0 40px rgba(255, 255, 255, 0.2);
 }
 
 .phrase-separator {
