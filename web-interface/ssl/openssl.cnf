@@ -16,4 +16,4 @@ DNS.1 = localhost
 DNS.2 = today.local
 DNS.3 = *.local
 IP.1 = 127.0.0.1
-IP.2 = 10.10.100.193
+IP.2 = 10.12.18.138

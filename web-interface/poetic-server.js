@@ -57,6 +57,30 @@ class PoeticServer {
             }
         });
         
+        // API pour générer un MP3 individuel à la demande
+        this.app.post('/api/generate-phrase-audio/:phraseIndex', async (req, res) => {
+            try {
+                const phraseIndex = parseInt(req.params.phraseIndex);
+                
+                // Récupérer les données de la phrase depuis le body
+                const { phrase } = req.body;
+                
+                if (!phrase) {
+                    return res.status(400).json({ error: 'Données de phrase manquantes' });
+                }
+                
+                console.log(`🎵 Génération MP3 à la demande pour phrase ${phraseIndex + 1}`);
+                
+                // Appeler le script Python pour générer le fichier
+                const result = await this.generateSinglePhraseAudio(phrase, phraseIndex);
+                res.json(result);
+                
+            } catch (error) {
+                console.error('Erreur génération phrase audio:', error);
+                res.status(500).json({ error: error.message });
+            }
+        });
+        
         // API pour génération poétique
         this.app.post('/api/generate', async (req, res) => {
             try {
@@ -112,8 +136,10 @@ class PoeticServer {
             }
         });
         
-        // Servir les fichiers audio générés
+        // Servir les fichiers audio générés (montages et extraits individuels)
+        // Les montages sont dans output_mix_play, les extraits dans web-interface/public/audio
         this.app.use('/audio', express.static(path.join(this.projectRoot, 'output_mix_play')));
+        this.app.use('/audio', express.static(path.join(__dirname, 'public', 'audio')));
         
         // Gestion d'erreur artistique
         this.app.use((err, req, res, next) => {
@@ -168,6 +194,52 @@ class PoeticServer {
     /* ===========================
        GÉNÉRATION POÉTIQUE
        =========================== */
+    
+    async generateSinglePhraseAudio(phraseData, phraseIndex) {
+        return new Promise((resolve, reject) => {
+            const script = path.join(__dirname, 'generate_single_phrase_audio.py');
+            
+            // Passer les données de la phrase en JSON
+            const pythonArgs = [
+                script,
+                JSON.stringify(phraseData),
+                phraseIndex.toString()
+            ];
+            
+            const python = spawn(this.pythonPath, pythonArgs);
+            
+            let output = '';
+            let error = '';
+            
+            python.stdout.on('data', (data) => {
+                output += data.toString('utf8');
+            });
+            
+            python.stderr.on('data', (data) => {
+                error += data.toString('utf8');
+            });
+            
+            python.on('close', (code) => {
+                if (code !== 0) {
+                    console.error('❌ Erreur Python génération phrase:', error);
+                    reject(new Error('Erreur lors de la génération du fichier audio'));
+                    return;
+                }
+                
+                try {
+                    const result = JSON.parse(output.trim());
+                    if (result.success) {
+                        resolve(result);
+                    } else {
+                        reject(new Error(result.error || 'Génération échouée'));
+                    }
+                } catch (e) {
+                    console.error('❌ Erreur parsing JSON:', e, '\nOutput:', output);
+                    reject(new Error('Erreur de parsing de la réponse'));
+                }
+            });
+        });
+    }
     
     async generatePoetry(words, count = 3, includeNext = 0) {
         return new Promise((resolve, reject) => {

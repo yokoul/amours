@@ -677,9 +677,12 @@ class PoeticInterface {
         const phraseDisplay = document.getElementById('phrase-display');
         const playBtn = document.getElementById('play-btn');
         
-        // Stocker les données pour le karaoké
+        // Stocker les données complètes pour le karaoké et la génération à la demande
         this.karaokeData = data.phrases || [];
         this.currentPhraseIndex = 0;
+        
+        // Stocker également les données brutes pour les requêtes API
+        this.currentGenerationData = data;
         
         // Afficher le texte initial avec structure pour karaoké
         this.renderKaraokeText();
@@ -758,6 +761,23 @@ class PoeticInterface {
             const dominantType = Object.entries(phrase.love_analysis)
                 .sort((a, b) => b[1] - a[1])[0];
             
+            // Conteneur pour le point + bouton download
+            const pointContainer = document.createElement('div');
+            pointContainer.className = 'timeline-point-container';
+            pointContainer.setAttribute('data-phrase-index', index);
+            
+            // Bouton de téléchargement (au-dessus du point)
+            // Toujours afficher le bouton, la génération se fera à la demande
+            const downloadBtn = document.createElement('button');
+            downloadBtn.className = 'timeline-download-btn';
+            downloadBtn.title = `Télécharger l'extrait ${index + 1}`;
+            downloadBtn.innerHTML = '⬇';
+            downloadBtn.onclick = async (e) => {
+                e.stopPropagation();
+                await this.downloadPhraseAudio(phrase, index, downloadBtn);
+            };
+            pointContainer.appendChild(downloadBtn);
+            
             // Créer le point de la phrase
             const point = document.createElement('div');
             point.className = 'timeline-point';
@@ -806,7 +826,8 @@ class PoeticInterface {
                 }
             });
             
-            timeline.appendChild(point);
+            pointContainer.appendChild(point);
+            timeline.appendChild(pointContainer);
         });
         
         container.appendChild(timeline);
@@ -849,6 +870,63 @@ class PoeticInterface {
         const tooltip = document.getElementById('timeline-tooltip');
         if (tooltip) {
             tooltip.style.display = 'none';
+        }
+    }
+    
+    async downloadPhraseAudio(phrase, index, btn) {
+        try {
+            // Afficher un indicateur de chargement sur le bouton
+            const originalContent = btn.innerHTML;
+            btn.innerHTML = '⏳';
+            btn.disabled = true;
+            
+            // Demander la génération du fichier audio
+            const response = await fetch(`/api/generate-phrase-audio/${index}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    phrase: phrase  // Envoyer les données de cette phrase spécifique
+                })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Erreur lors de la génération du fichier audio');
+            }
+            
+            const result = await response.json();
+            
+            if (!result.audio_file) {
+                throw new Error('Aucun fichier audio généré');
+            }
+            
+            // Télécharger le fichier
+            const link = document.createElement('a');
+            link.href = `/audio/${result.audio_file}`;
+            link.download = result.audio_file;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // Restaurer le bouton
+            btn.innerHTML = originalContent;
+            btn.disabled = false;
+            
+            // Feedback visuel de succès
+            btn.innerHTML = '✓';
+            setTimeout(() => {
+                btn.innerHTML = originalContent;
+            }, 1000);
+            
+        } catch (error) {
+            console.error('❌ Erreur téléchargement:', error);
+            
+            // Restaurer le bouton en cas d'erreur
+            btn.innerHTML = '✗';
+            btn.disabled = false;
+            setTimeout(() => {
+                btn.innerHTML = '⬇';
+            }, 2000);
         }
     }
     

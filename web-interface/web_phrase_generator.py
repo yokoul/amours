@@ -20,6 +20,14 @@ current_dir = Path(__file__).parent
 parent_dir = current_dir.parent
 sys.path.append(str(parent_dir))
 
+# Import PyDub pour l'extraction des phrases individuelles
+try:
+    from pydub import AudioSegment
+    PYDUB_AVAILABLE = True
+except ImportError:
+    print("⚠️ PyDub non disponible - extraction de phrases désactivée", file=sys.stderr)
+    PYDUB_AVAILABLE = False
+
 # Importer le sélecteur existant
 try:
     # Import depuis phrase_montage.py
@@ -68,6 +76,85 @@ class WebPhraseGenerator:
         # Pas besoin de LoveTypeAnalyzer - les données sont déjà dans les JSON
         self.love_analyzer = None
     
+    def _generate_individual_phrase_files(self, phrases: List[PhraseMatch], 
+                                         timestamp: str, 
+                                         keywords: List[str],  # Liste complète des mots-clés
+                                         include_next: int = 0) -> List[str]:
+        """
+        Génère les fichiers MP3 individuels pour chaque phrase
+        
+        Returns:
+            Liste des URLs relatives des fichiers générés
+        """
+        if not PYDUB_AVAILABLE:
+            return []
+        
+        individual_urls = []
+        
+        print(f"🎵 Génération de {len(phrases)} fichiers MP3 individuels...", file=sys.stderr)
+        
+        # Cache pour éviter de charger plusieurs fois le même fichier audio
+        audio_cache = {}
+        
+        for i, phrase in enumerate(phrases, 1):
+            try:
+                # Charger l'audio source (avec cache)
+                if phrase.audio_path not in audio_cache:
+                    audio_cache[phrase.audio_path] = AudioSegment.from_file(phrase.audio_path)
+                source_audio = audio_cache[phrase.audio_path]
+                
+                # Extraire la phrase
+                start_ms = int(phrase.start * 1000)
+                end_ms = int(phrase.end * 1000)
+                
+                # Ajouter padding
+                padding_ms = 100
+                start_ms = max(0, start_ms - padding_ms)
+                
+                # Étendre si include_next > 0
+                if include_next > 0:
+                    extended_end = self.selector._get_next_phrase_same_speaker(phrase, include_next)
+                    if extended_end:
+                        end_ms = int(extended_end * 1000)
+                    else:
+                        end_ms = min(len(source_audio), end_ms + padding_ms)
+                else:
+                    end_ms = min(len(source_audio), end_ms + padding_ms)
+                
+                phrase_audio = source_audio[start_ms:end_ms]
+                
+                # Normaliser
+                phrase_audio = phrase_audio.normalize()
+                
+                # Appliquer des fondus doux
+                fade_ms = 100
+                phrase_audio = phrase_audio.fade_in(fade_ms).fade_out(fade_ms)
+                
+                # Nom du fichier avec le mot-clé de cette phrase
+                # Utiliser le premier mot-clé trouvé dans cette phrase
+                raw_keyword = phrase.keywords_found[0] if phrase.keywords_found else "extrait"
+                # Nettoyer le mot-clé : garder uniquement la partie avant ≈ et enlever caractères spéciaux
+                phrase_keyword = raw_keyword.split('≈')[0].strip()
+                # Remplacer les caractères non-alphanumériques par underscore
+                phrase_keyword = ''.join(c if c.isalnum() or c in '-_' else '_' for c in phrase_keyword)
+                individual_filename = f"extrait_{phrase_keyword}_{i}_{timestamp}.mp3"
+                individual_path = self.output_dir / individual_filename
+                
+                # Sauvegarder
+                phrase_audio.export(str(individual_path), format="mp3", bitrate="192k")
+                
+                # URL relative
+                individual_url = f"/audio/{individual_filename}"
+                individual_urls.append(individual_url)
+                
+                print(f"  ✓ Phrase {i}: {individual_filename}", file=sys.stderr)
+                
+            except Exception as e:
+                print(f"  ✗ Erreur phrase {i}: {e}", file=sys.stderr)
+                individual_urls.append(None)
+        
+        return individual_urls
+    
     def generate_web_phrases(self, keywords: List[str], num_phrases: int = 3, include_next: int = 0) -> WebPhraseResult:
         """
         Génère des phrases pour l'interface web
@@ -88,23 +175,27 @@ class WebPhraseGenerator:
             )
         
         try:
-            # Rechercher les phrases avec tous les mots-clés
-            matches = self.selector.search_phrases(
-                keywords, 
-                max_results=num_phrases * 5,  # Chercher plus pour avoir du choix
-                max_duration=15.0,
-                diversify_sources=True
-            )
+            # Rechercher une phrase pour chaque mot-clé
+            selected_phrases = []
             
-            if not matches:
+            for keyword in keywords:
+                matches = self.selector.search_phrases(
+                    [keyword],  # Chercher un seul mot-clé à la fois
+                    max_results=5,  # Quelques options par mot
+                    max_duration=15.0,
+                    diversify_sources=True
+                )
+                
+                if matches:
+                    # Prendre la meilleure phrase pour ce mot-clé
+                    selected_phrases.append(matches[0])
+            
+            if not selected_phrases:
                 return WebPhraseResult(
                     success=False,
                     phrases=[],
                     error=f"Aucune phrase trouvée pour les mots: {', '.join(keywords)}"
                 )
-            
-            # Sélection des meilleures phrases
-            selected_phrases = matches[:num_phrases]
             
             # Créer le fichier audio
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -123,6 +214,17 @@ class WebPhraseGenerator:
                 keywords=keywords,
                 include_next_phrases=include_next  # Inclure N phrases suivantes du même intervenant
             )
+            
+            # NOTE: Génération des MP3 individuels désactivée (génération à la demande)
+            # Les fichiers seront générés uniquement quand l'utilisateur clique sur le bouton de téléchargement
+            individual_files = []
+            # if PYDUB_AVAILABLE:
+            #     individual_files = self._generate_individual_phrase_files(
+            #         selected_phrases, 
+            #         timestamp, 
+            #         keywords,  # Passer la liste complète des mots-clés
+            #         include_next
+            #     )
             
             # Calculer la durée totale (base)
             total_duration = sum(phrase.end - phrase.start for phrase in selected_phrases)
@@ -195,21 +297,29 @@ class WebPhraseGenerator:
                 # Construire le texte complet à partir des mots récupérés (incluant les extensions)
                 full_text = ''.join([w['word'] for w in words_data]) if words_data else phrase.text
                 
+                # Ajouter l'URL du fichier MP3 individuel si disponible
+                individual_audio_url = None
+                if i < len(individual_files):
+                    individual_audio_url = individual_files[i]
+                
                 phrases_data.append({
                     'index': i + 1,
                     'text': full_text,  # Texte complet incluant les extensions
                     'speaker': phrase.speaker,
                     'file_name': phrase.file_name,
+                    'audio_path': phrase.audio_path,  # Chemin complet vers le fichier audio
                     'keywords_found': phrase.keywords_found,
                     'match_score': phrase.match_score,
                     'start_time': phrase.start,
-                    'end_time': phrase.end,
+                    'end_time': phrase.end,  # Fin de la phrase de base
+                    'extended_end_time': extended_end,  # Fin étendue incluant les phrases suivantes
                     'duration': base_duration,  # Durée de base
                     'real_duration': real_duration,  # Durée réelle dans le montage (avec extensions)
                     'gap_after': gap_duration if i < len(selected_phrases) - 1 else 0,  # Gap après ce segment
                     'words': words_data,  # Timestamps mot par mot pour le karaoké
                     'love_type': getattr(phrase, 'love_type', None),
-                    'love_analysis': getattr(phrase, 'love_analysis', None)  # Récupérer depuis le match
+                    'love_analysis': getattr(phrase, 'love_analysis', None),  # Récupérer depuis le match
+                    'individual_audio_url': individual_audio_url  # URL du MP3 individuel
                 })
                 
                 # Avancer le temps du montage pour la prochaine phrase
