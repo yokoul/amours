@@ -46,39 +46,113 @@ class TranscriptionSearcher:
         # Garde les accents mais passe en minuscules pour la recherche
         return text.lower()
     
-    def _get_segment_context(self, segments: List[Dict], target_index: int, context_size: int = 2) -> Dict[str, Any]:
+    def _count_sentences(self, text: str) -> int:
+        """Compte approximativement le nombre de phrases dans un texte"""
+        # Compter les ponctuations de fin de phrase
+        sentence_endings = text.count('.') + text.count('!') + text.count('?')
+        return max(1, sentence_endings)
+    
+    def _truncate_to_sentences(self, text: str, max_sentences: int) -> str:
+        """Tronque un texte à un nombre maximum de phrases"""
+        sentences = []
+        current = []
+        count = 0
+        
+        for char in text:
+            current.append(char)
+            if char in '.!?':
+                count += 1
+                if count >= max_sentences:
+                    sentences.append(''.join(current))
+                    break
+                sentences.append(''.join(current))
+                current = []
+        
+        result = ''.join(sentences).strip()
+        if count > max_sentences:
+            result += '...'
+        return result
+    
+    def _get_segment_context(self, segments: List[Dict], target_index: int, max_sentences: int = 5) -> Dict[str, Any]:
         """
-        Récupère le contexte autour d'un segment (segments avant et après)
+        Récupère le contexte autour d'un segment en limitant par nombre de phrases
         
         Args:
             segments: Liste de tous les segments
             target_index: Index du segment trouvé
-            context_size: Nombre de segments avant/après à inclure (défaut: 2-3)
+            max_sentences: Nombre maximum de phrases dans le contexte (défaut: 5)
         
         Returns:
             Dictionnaire avec les segments de contexte
         """
-        start_idx = max(0, target_index - context_size)
-        end_idx = min(len(segments), target_index + context_size + 1)
+        context_segments = []
+        total_sentences = 0
         
-        context_segments = segments[start_idx:end_idx]
+        # Toujours inclure le segment cible
+        target_seg = segments[target_index]
+        target_sentences = self._count_sentences(target_seg['text'])
+        context_segments.append(target_seg)
+        total_sentences = target_sentences
+        
+        # Si le segment cible dépasse déjà la limite, le tronquer
+        if total_sentences > max_sentences:
+            # Tronquer le texte au nombre maximum de phrases
+            truncated_text = self._truncate_to_sentences(target_seg['text'], max_sentences)
+            return {
+                'segments': [{'text': truncated_text, **{k: v for k, v in target_seg.items() if k != 'text'}}],
+                'start_time': target_seg['start'],
+                'end_time': target_seg['end'],
+                'duration': target_seg['end'] - target_seg['start'],
+                'text': truncated_text,
+                'target_segment_index': target_index,
+                'total_sentences': max_sentences
+            }
+        
+        # Ajouter des segments avant et après tant qu'on ne dépasse pas max_sentences
+        before_idx = target_index - 1
+        after_idx = target_index + 1
+        
+        # Alterner entre avant et après pour équilibrer le contexte
+        while (before_idx >= 0 or after_idx < len(segments)) and total_sentences < max_sentences:
+            # Essayer d'ajouter un segment avant
+            if before_idx >= 0:
+                seg = segments[before_idx]
+                seg_sentences = self._count_sentences(seg['text'])
+                if total_sentences + seg_sentences <= max_sentences:
+                    context_segments.insert(0, seg)
+                    total_sentences += seg_sentences
+                    before_idx -= 1
+                else:
+                    # On ne peut plus ajouter avant sans dépasser
+                    before_idx = -1
+            
+            # Essayer d'ajouter un segment après
+            if after_idx < len(segments) and total_sentences < max_sentences:
+                seg = segments[after_idx]
+                seg_sentences = self._count_sentences(seg['text'])
+                if total_sentences + seg_sentences <= max_sentences:
+                    context_segments.append(seg)
+                    total_sentences += seg_sentences
+                    after_idx += 1
+                else:
+                    # On ne peut plus ajouter après sans dépasser
+                    after_idx = len(segments)
+        
+        # Construire le texte complet du contexte
+        full_text = " ".join([seg['text'] for seg in context_segments])
         
         # Calculer les timecodes de début et fin
         start_time = context_segments[0]['start']
         end_time = context_segments[-1]['end']
-        
-        # Construire le texte complet du contexte
-        context_text = " ".join([seg['text'] for seg in context_segments])
         
         return {
             'segments': context_segments,
             'start_time': start_time,
             'end_time': end_time,
             'duration': end_time - start_time,
-            'text': context_text,
+            'text': full_text,
             'target_segment_index': target_index,
-            'context_start_index': start_idx,
-            'context_end_index': end_idx
+            'total_sentences': total_sentences
         }
     
     def _search_in_segments(self, segments: List[Dict], query: str) -> List[int]:
@@ -157,7 +231,7 @@ class TranscriptionSearcher:
             
             # Pour chaque correspondance, créer un résultat avec contexte
             for idx in matching_indices:
-                context = self._get_segment_context(segments, idx, context_size=2)
+                context = self._get_segment_context(segments, idx, max_sentences=5)
                 
                 # Récupérer les métadonnées du fichier source
                 metadata = data.get('metadata', {})
