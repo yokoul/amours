@@ -16,6 +16,7 @@ class SearchModule {
         this.currentPlayBtn = null;
         this.currentTextContainer = null; // Pour l'animation karaoké
         this.animationFrameId = null; // Pour optimiser l'animation
+        this.audioCache = new Map(); // Cache des extraits audio générés
         this.isOpen = false;
         
         this.init();
@@ -234,17 +235,16 @@ class SearchModule {
     }
     
     setupPlayer(playBtn, result, textContainer) {
-        const audio = new Audio();
-        const audioUrl = this.getAudioUrl(result.source_path);
-        audio.src = audioUrl;
+        // Créer une clé de cache unique pour cet extrait
+        const cacheKey = `${result.source_path}_${result.start_time}_${result.end_time}`;
         
         const startTime = result.start_time;
         const endTime = result.end_time;
         
-        playBtn.addEventListener('click', () => {
-            if (audio.paused) {
+        playBtn.addEventListener('click', async () => {
+            if (!playBtn._audio || playBtn._audio.paused) {
                 // Arrêter tout autre audio
-                if (this.currentAudio && this.currentAudio !== audio) {
+                if (this.currentAudio && this.currentAudio !== playBtn._audio) {
                     this.currentAudio.pause();
                     if (this.currentPlayBtn) {
                         this.currentPlayBtn.innerHTML = '<span class="play-symbol">▶</span>';
@@ -261,74 +261,120 @@ class SearchModule {
                     }
                 }
                 
-                // Démarrer la lecture
-                audio.currentTime = startTime;
-                audio.play();
-                playBtn.innerHTML = '<span class="play-symbol">❙❙</span>';
-                playBtn.classList.add('playing');
+                // Désactiver le bouton pendant le chargement
+                playBtn.disabled = true;
+                const originalContent = playBtn.innerHTML;
+                playBtn.innerHTML = '<span class="play-symbol">⏳</span>';
                 
-                this.currentAudio = audio;
-                this.currentPlayBtn = playBtn;
-                this.currentTextContainer = textContainer;
+                try {
+                    // Vérifier le cache d'abord
+                    let audioUrl;
+                    if (this.audioCache.has(cacheKey)) {
+                        audioUrl = this.audioCache.get(cacheKey);
+                    } else {
+                        // Extraire le segment audio via l'API
+                        const response = await fetch('/api/extract-search-audio', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                audio_path: result.source_path,
+                                start_time: result.start_time,
+                                end_time: result.end_time
+                            })
+                        });
+                        
+                        if (!response.ok) {
+                            throw new Error('Erreur lors de l\'extraction audio');
+                        }
+                        
+                        const data = await response.json();
+                        if (!data.success || !data.audio_file) {
+                            throw new Error('Aucun fichier audio généré');
+                        }
+                        
+                        audioUrl = `/audio/${data.audio_file}`;
+                        this.audioCache.set(cacheKey, audioUrl);
+                    }
+                    
+                    // Créer ou réutiliser l'objet Audio
+                    if (!playBtn._audio) {
+                        playBtn._audio = new Audio();
+                        playBtn._audio.src = audioUrl;
+                        
+                        // Animation karaoké avec requestAnimationFrame
+                        let lastUpdateTime = 0;
+                        const updateInterval = 100;
+                        
+                        playBtn._audio.addEventListener('timeupdate', () => {
+                            const now = Date.now();
+                            
+                            if (now - lastUpdateTime < updateInterval) {
+                                return;
+                            }
+                            lastUpdateTime = now;
+                            
+                            if (this.animationFrameId) {
+                                cancelAnimationFrame(this.animationFrameId);
+                            }
+                            
+                            this.animationFrameId = requestAnimationFrame(() => {
+                                // Ajuster le temps pour correspondre à la transcription complète
+                                const adjustedTime = playBtn._audio.currentTime + startTime;
+                                this.animateResultKaraoke(adjustedTime, textContainer);
+                            });
+                        });
+                        
+                        // Fin de lecture
+                        playBtn._audio.addEventListener('ended', () => {
+                            playBtn.innerHTML = '<span class="play-symbol">▶</span>';
+                            playBtn.classList.remove('playing');
+                            
+                            if (textContainer._karaokeWords) {
+                                textContainer._karaokeWords.forEach(w => w.classList.remove('active'));
+                            }
+                            
+                            if (this.animationFrameId) {
+                                cancelAnimationFrame(this.animationFrameId);
+                                this.animationFrameId = null;
+                            }
+                        });
+                        
+                        playBtn._audio.addEventListener('error', () => {
+                            playBtn.disabled = true;
+                            playBtn.innerHTML = '<span class="play-symbol">✕</span>';
+                            playBtn.style.opacity = '0.3';
+                        });
+                    }
+                    
+                    // Démarrer la lecture
+                    playBtn._audio.currentTime = 0;
+                    await playBtn._audio.play();
+                    playBtn.innerHTML = '<span class="play-symbol">❙❙</span>';
+                    playBtn.classList.add('playing');
+                    playBtn.disabled = false;
+                    
+                    this.currentAudio = playBtn._audio;
+                    this.currentPlayBtn = playBtn;
+                    this.currentTextContainer = textContainer;
+                    
+                } catch (error) {
+                    console.error('Erreur lecture audio:', error);
+                    playBtn.innerHTML = originalContent;
+                    playBtn.disabled = false;
+                    alert('Impossible de lire cet extrait audio');
+                }
+                
             } else {
-                audio.pause();
+                // Mettre en pause
+                playBtn._audio.pause();
                 playBtn.innerHTML = '<span class="play-symbol">▶</span>';
                 playBtn.classList.remove('playing');
-                
-                // Annuler l'animation frame
-                if (this.animationFrameId) {
-                    cancelAnimationFrame(this.animationFrameId);
-                    this.animationFrameId = null;
-                }
-            }
-        });
-        
-        // Animation karaoké avec requestAnimationFrame pour optimiser
-        let lastUpdateTime = 0;
-        const updateInterval = 100; // Mise à jour max toutes les 100ms
-        
-        audio.addEventListener('timeupdate', () => {
-            const now = Date.now();
-            
-            // Throttle: ne mettre à jour que toutes les 100ms
-            if (now - lastUpdateTime < updateInterval) {
-                return;
-            }
-            lastUpdateTime = now;
-            
-            // Utiliser requestAnimationFrame pour l'animation
-            if (this.animationFrameId) {
-                cancelAnimationFrame(this.animationFrameId);
-            }
-            
-            this.animationFrameId = requestAnimationFrame(() => {
-                this.animateResultKaraoke(audio.currentTime, textContainer);
-            });
-            
-            // Arrêter à la fin de l'extrait
-            if (audio.currentTime >= endTime) {
-                audio.pause();
-                audio.currentTime = startTime;
-                playBtn.innerHTML = '<span class="play-symbol">▶</span>';
-                playBtn.classList.remove('playing');
-                
-                // Réinitialiser l'animation karaoké
-                if (textContainer._karaokeWords) {
-                    textContainer._karaokeWords.forEach(w => w.classList.remove('active'));
-                }
                 
                 if (this.animationFrameId) {
                     cancelAnimationFrame(this.animationFrameId);
                     this.animationFrameId = null;
                 }
             }
-        });
-        
-        // Gestion des erreurs
-        audio.addEventListener('error', () => {
-            playBtn.disabled = true;
-            playBtn.innerHTML = '<span class="play-symbol">✕</span>';
-            playBtn.style.opacity = '0.3';
         });
     }
     
@@ -353,21 +399,6 @@ class SearchModule {
                 }
             }
         });
-    }
-    
-    getAudioUrl(sourcePath) {
-        const fileName = sourcePath.split('/').pop();
-        
-        // Détecter le sous-dossier
-        let subFolder = '';
-        if (sourcePath.includes('/biotech/')) subFolder = 'biotech';
-        else if (sourcePath.includes('/bop/')) subFolder = 'bop';
-        else if (sourcePath.includes('/cmu/')) subFolder = 'cmu';
-        else if (sourcePath.includes('/fil/')) subFolder = 'fil';
-        else if (sourcePath.includes('/mah/')) subFolder = 'mah';
-        else if (sourcePath.includes('/contributions/')) subFolder = 'contributions';
-        
-        return `/audio-sources/${subFolder}/${fileName}`;
     }
     
     setupDownload(btn, result) {
