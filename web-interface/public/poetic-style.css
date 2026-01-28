@@ -1199,29 +1199,22 @@ body {
     transform: scale(0.95);
 }
 
-.filter-toggle-btn.active {
+.filter-toggle-btn.reset-mode {
     opacity: 1;
+    border-color: var(--black);
     background: var(--black);
     color: var(--white);
-    border-color: var(--black);
 }
 
 /* Filtres de recherche */
 .search-filters {
-    overflow: hidden;
-    transition: max-height 0.4s ease-out;
-    border-bottom: 1px solid var(--grey-light);
     background: var(--grey-light);
-}
-
-.search-filters.collapsed {
-    max-height: 0 !important;
-    border-bottom: none;
+    border-bottom: 1px solid var(--grey-light);
 }
 
 .source-filters {
     padding: var(--space-s) var(--space-m);
-    max-height: 250px;
+    max-height: 220px;
     overflow-y: auto;
 }
 

@@ -50,35 +50,15 @@ class SearchModule {
             }
         });
         
-        // Gestion du repliage du filtre
+        // Gestion du bouton filtre/reset
         const filterToggleBtn = document.getElementById('filter-toggle-btn');
-        const searchFilters = document.getElementById('search-filters');
-        if (filterToggleBtn && searchFilters) {
+        if (filterToggleBtn) {
             filterToggleBtn.addEventListener('click', () => {
-                const isCollapsed = searchFilters.classList.contains('collapsed');
-                
-                if (isCollapsed) {
-                    // Déployer : calculer la hauteur réelle
-                    searchFilters.classList.remove('collapsed');
-                    const height = searchFilters.scrollHeight;
-                    searchFilters.style.maxHeight = '0px';
-                    // Force reflow
-                    searchFilters.offsetHeight;
-                    searchFilters.style.maxHeight = height + 'px';
-                    filterToggleBtn.classList.add('active');
-                } else {
-                    // Replier
-                    searchFilters.style.maxHeight = searchFilters.scrollHeight + 'px';
-                    // Force reflow
-                    searchFilters.offsetHeight;
-                    searchFilters.style.maxHeight = '0px';
-                    filterToggleBtn.classList.remove('active');
-                    
-                    // Ajouter la classe collapsed après la transition
-                    setTimeout(() => {
-                        searchFilters.classList.add('collapsed');
-                    }, 400);
+                if (filterToggleBtn.classList.contains('reset-mode')) {
+                    // Mode reset : réinitialiser tout
+                    this.resetSearch();
                 }
+                // Sinon c'est juste l'icône filtre, pas d'action
             });
         }
         
@@ -115,6 +95,42 @@ class SearchModule {
             cancelAnimationFrame(this.animationFrameId);
             this.animationFrameId = null;
         }
+    }
+    
+    resetSearch() {
+        // Réinitialiser le champ de recherche
+        this.searchInput.value = '';
+        
+        // Effacer les résultats
+        this.searchResults.innerHTML = '';
+        this.searchInfo.style.display = 'none';
+        
+        // Réinitialiser les filtres
+        this.selectedSources.clear();
+        const checkboxes = document.querySelectorAll('.source-filter-item input[type="checkbox"]');
+        checkboxes.forEach(cb => cb.checked = false);
+        
+        // Réinitialiser l'état
+        this.currentPage = 1;
+        this.totalResults = 0;
+        this.currentQuery = '';
+        
+        // Remettre le bouton en mode filtre
+        const filterToggleBtn = document.getElementById('filter-toggle-btn');
+        if (filterToggleBtn) {
+            filterToggleBtn.classList.remove('reset-mode');
+            filterToggleBtn.textContent = '⚙︎';
+            filterToggleBtn.title = 'Filtrer par source';
+        }
+        
+        // Mettre à jour le texte du bouton toggle all
+        const toggleAllBtn = document.querySelector('.filter-toggle-all');
+        if (toggleAllBtn) {
+            toggleAllBtn.textContent = 'tout sélectionner';
+        }
+        
+        // Focus sur le champ de recherche
+        this.searchInput.focus();
     }
     
     async loadAvailableSources() {
@@ -284,6 +300,14 @@ class SearchModule {
         
         this.searchInfo.style.display = 'block';
         this.searchInfo.textContent = `${this.totalResults} résultat${this.totalResults > 1 ? 's' : ''} trouvé${this.totalResults > 1 ? 's' : ''} · Affichage ${startResult}-${endResult}`;
+        
+        // Activer le mode reset sur le bouton
+        const filterToggleBtn = document.getElementById('filter-toggle-btn');
+        if (filterToggleBtn) {
+            filterToggleBtn.classList.add('reset-mode');
+            filterToggleBtn.textContent = '↺';
+            filterToggleBtn.title = 'Réinitialiser la recherche';
+        }
         
         if (data.results.length === 0) {
             this.showNoResults(data.query);
