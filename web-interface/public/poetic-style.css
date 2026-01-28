@@ -1237,6 +1237,15 @@ body {
     margin-bottom: var(--space-s);
     -webkit-user-select: text;
     user-select: text;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
+}
+
+/* Mots karaoké dans les résultats de recherche */
+.result-text .karaoke-word {
+    white-space: normal;
+    display: inline;
 }
 
 .result-text mark {
