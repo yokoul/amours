@@ -33,17 +33,18 @@ class InteractiveLauncher:
         print("2. 🔧 Reconstruction de phrases (sur JSON existant)")
         print("3. ❤️  Analyse sémantique d'amour")
         print("4. 🔄 Workflow complet (Transcription → Reconstruction → Analyse)")
-        print("5. 📁 Lister les fichiers disponibles")
-        print("6. ❌ Quitter")
+        print("5. � Traitement BATCH de tous les audios (avec Whisper large)")
+        print("6. 📁 Lister les fichiers disponibles")
+        print("7. ❌ Quitter")
         print()
         
         while True:
             try:
-                choice = int(input("Votre choix (1-6): ").strip())
-                if 1 <= choice <= 6:
+                choice = int(input("Votre choix (1-7): ").strip())
+                if 1 <= choice <= 7:
                     return choice
                 else:
-                    print("❌ Choix invalide. Entrez un numéro entre 1 et 6.")
+                    print("❌ Choix invalide. Entrez un numéro entre 1 et 7.")
             except ValueError:
                 print("❌ Veuillez entrer un numéro valide.")
     
@@ -371,6 +372,94 @@ class InteractiveLauncher:
         print("   • Phrases reconstruites")
         print("   • Analyse sémantique des types d'amour")
     
+    def batch_process_all_audio(self):
+        """Traite tous les fichiers audio en batch avec Whisper large."""
+        print("\n🔥 TRAITEMENT BATCH DE TOUS LES AUDIOS")
+        print("=" * 60)
+        
+        audio_files = self.list_audio_files()
+        
+        if not audio_files:
+            print("❌ Aucun fichier audio trouvé.")
+            input("\nAppuyez sur Entrée pour continuer...")
+            return
+        
+        print(f"\n📊 {len(audio_files)} fichiers audio trouvés")
+        print("\n⚙️  CONFIGURATION DU BATCH:")
+        print("   • Modèle Whisper: LARGE (haute qualité)")
+        print("   • Reconstruction de phrases: OUI")
+        print("   • Analyse sémantique: OUI")
+        print("   • Écrasement des JSON existants: OUI")
+        print()
+        
+        # Demander confirmation
+        confirm = input(f"⚠️  Voulez-vous traiter ces {len(audio_files)} fichiers ? (O/n): ").strip().lower()
+        if confirm in ['n', 'non', 'no']:
+            print("❌ Traitement batch annulé.")
+            return
+        
+        # Dossiers de sortie
+        output_dir = self.get_output_directory()
+        output_semantic = "output_semantic"
+        
+        # Traiter chaque fichier
+        success_count = 0
+        fail_count = 0
+        
+        for i, audio_file in enumerate(audio_files, 1):
+            print("\n" + "=" * 60)
+            print(f"🎵 Traitement {i}/{len(audio_files)}: {audio_file.name}")
+            print("=" * 60)
+            
+            # Étape 1: Transcription avec reconstruction et analyse intégrée
+            transcribe_cmd = [
+                'python', 'transcribe_audio.py',
+                '--input', str(audio_file),
+                '--output', output_dir,
+                '--formats', 'json',
+                '--whisper-model', 'large',
+                '--reconstruct-sentences',
+                '--with-semantic-analysis'
+            ]
+            
+            if not self.run_command(transcribe_cmd, f"Transcription de {audio_file.name}"):
+                fail_count += 1
+                continue
+            
+            # Étape 2: Générer les fichiers d'analyse sémantique séparés dans output_semantic/
+            # Construire le nom du fichier JSON de transcription
+            json_name = audio_file.stem + "_with_speakers_complete.json"
+            json_path = self.project_root / output_dir / json_name
+            
+            if json_path.exists():
+                print(f"\n📊 Génération des fichiers d'analyse sémantique...")
+                analyze_cmd = [
+                    'python', 'analyze_love.py',
+                    '--input', str(json_path),
+                    '--output', output_semantic,
+                    '--formats', 'json', 'summary',
+                    '--threshold', '0.15'
+                ]
+                
+                if self.run_command(analyze_cmd, f"Analyse sémantique de {audio_file.name}"):
+                    success_count += 1
+                else:
+                    fail_count += 1
+            else:
+                print(f"⚠️  Fichier JSON non trouvé: {json_path}")
+                fail_count += 1
+        
+        # Résumé
+        print("\n" + "=" * 60)
+        print("📊 RÉSUMÉ DU TRAITEMENT BATCH")
+        print("=" * 60)
+        print(f"✅ Fichiers traités avec succès: {success_count}")
+        if fail_count > 0:
+            print(f"❌ Fichiers en erreur: {fail_count}")
+        print(f"📂 Transcriptions dans: {output_dir}")
+        print(f"📂 Analyses sémantiques dans: {output_semantic}")
+        print("\n🎉 Traitement batch terminé!")
+    
     def list_files(self):
         """Affiche les fichiers disponibles."""
         print("\n📁 FICHIERS DISPONIBLES")
@@ -420,12 +509,14 @@ class InteractiveLauncher:
             elif choice == 4:
                 self.complete_workflow()
             elif choice == 5:
-                self.list_files()
+                self.batch_process_all_audio()
             elif choice == 6:
+                self.list_files()
+            elif choice == 7:
                 print("\n👋 Au revoir!")
                 break
             
-            if choice != 6:
+            if choice != 7:
                 input("\nAppuyez sur Entrée pour continuer...")
                 print("\n" + "=" * 70)
 

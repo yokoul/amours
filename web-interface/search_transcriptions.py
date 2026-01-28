@@ -47,9 +47,20 @@ class TranscriptionSearcher:
         return text.lower()
     
     def _count_sentences(self, text: str) -> int:
-        """Compte approximativement le nombre de phrases dans un texte"""
+        """
+        Compte approximativement le nombre de phrases dans un texte.
+        Pour les transcriptions audio, on compte les ponctuations ET les virgules
+        car il y a souvent peu de points dans le dialogue parlé.
+        """
         # Compter les ponctuations de fin de phrase
         sentence_endings = text.count('.') + text.count('!') + text.count('?')
+        
+        # Si très peu de ponctuations, compter aussi les virgules (dialogue parlé)
+        if sentence_endings < 2:
+            # Une virgule = environ 1/3 de phrase
+            comma_count = text.count(',')
+            sentence_endings += comma_count // 3
+        
         return max(1, sentence_endings)
     
     def _truncate_to_sentences(self, text: str, max_sentences: int) -> str:
@@ -73,70 +84,76 @@ class TranscriptionSearcher:
             result += '...'
         return result
     
-    def _get_segment_context(self, segments: List[Dict], target_index: int, max_sentences: int = 5) -> Dict[str, Any]:
+    def _get_segment_context(self, segments: List[Dict], target_index: int, max_duration: float = 120.0) -> Dict[str, Any]:
         """
-        Récupère le contexte autour d'un segment en limitant par nombre de phrases
+        Récupère le contexte autour d'un segment en limitant par durée totale
         
         Args:
             segments: Liste de tous les segments
             target_index: Index du segment trouvé
-            max_sentences: Nombre maximum de phrases dans le contexte (défaut: 5)
+            max_duration: Durée maximale du contexte en secondes (défaut: 120s = 2 min)
         
         Returns:
             Dictionnaire avec les segments de contexte
         """
-        context_segments = []
-        total_sentences = 0
-        
-        # Toujours inclure le segment cible
+        # Protection : si le segment cible est lui-même trop long, le tronquer
         target_seg = segments[target_index]
-        target_sentences = self._count_sentences(target_seg['text'])
-        context_segments.append(target_seg)
-        total_sentences = target_sentences
+        target_duration = target_seg.get('duration', target_seg['end'] - target_seg['start'])
         
-        # Si le segment cible dépasse déjà la limite, le tronquer
-        if total_sentences > max_sentences:
-            # Tronquer le texte au nombre maximum de phrases
-            truncated_text = self._truncate_to_sentences(target_seg['text'], max_sentences)
+        if target_duration > max_duration:
+            # Segment géant : retourner seulement lui, tronqué
+            truncated_text = target_seg['text'][:500] + '...' if len(target_seg['text']) > 500 else target_seg['text']
             return {
-                'segments': [{'text': truncated_text, **{k: v for k, v in target_seg.items() if k != 'text'}}],
+                'segments': [target_seg],
                 'start_time': target_seg['start'],
-                'end_time': target_seg['end'],
-                'duration': target_seg['end'] - target_seg['start'],
+                'end_time': min(target_seg['end'], target_seg['start'] + max_duration),
+                'duration': min(target_duration, max_duration),
                 'text': truncated_text,
                 'target_segment_index': target_index,
-                'total_sentences': max_sentences
+                'total_segments': 1,
+                'truncated': True
             }
         
-        # Ajouter des segments avant et après tant qu'on ne dépasse pas max_sentences
+        context_segments = [target_seg]
+        current_duration = target_duration
+        
+        # Ajouter des segments avant et après en alternance
         before_idx = target_index - 1
         after_idx = target_index + 1
         
-        # Alterner entre avant et après pour équilibrer le contexte
-        while (before_idx >= 0 or after_idx < len(segments)) and total_sentences < max_sentences:
+        while (before_idx >= 0 or after_idx < len(segments)) and current_duration < max_duration:
+            added = False
+            
             # Essayer d'ajouter un segment avant
             if before_idx >= 0:
                 seg = segments[before_idx]
-                seg_sentences = self._count_sentences(seg['text'])
-                if total_sentences + seg_sentences <= max_sentences:
+                seg_duration = seg.get('duration', seg['end'] - seg['start'])
+                
+                # Vérifier que ce segment n'est pas géant et qu'on ne dépasse pas la limite
+                if seg_duration < 300 and current_duration + seg_duration <= max_duration:
                     context_segments.insert(0, seg)
-                    total_sentences += seg_sentences
+                    current_duration += seg_duration
                     before_idx -= 1
+                    added = True
                 else:
-                    # On ne peut plus ajouter avant sans dépasser
-                    before_idx = -1
+                    before_idx = -1  # Arrêter la recherche avant
             
             # Essayer d'ajouter un segment après
-            if after_idx < len(segments) and total_sentences < max_sentences:
+            if after_idx < len(segments) and current_duration < max_duration:
                 seg = segments[after_idx]
-                seg_sentences = self._count_sentences(seg['text'])
-                if total_sentences + seg_sentences <= max_sentences:
+                seg_duration = seg.get('duration', seg['end'] - seg['start'])
+                
+                # Vérifier que ce segment n'est pas géant et qu'on ne dépasse pas la limite
+                if seg_duration < 300 and current_duration + seg_duration <= max_duration:
                     context_segments.append(seg)
-                    total_sentences += seg_sentences
+                    current_duration += seg_duration
                     after_idx += 1
+                    added = True
                 else:
-                    # On ne peut plus ajouter après sans dépasser
-                    after_idx = len(segments)
+                    after_idx = len(segments)  # Arrêter la recherche après
+            
+            if not added:
+                break
         
         # Construire le texte complet du contexte
         full_text = " ".join([seg['text'] for seg in context_segments])
@@ -152,7 +169,8 @@ class TranscriptionSearcher:
             'duration': end_time - start_time,
             'text': full_text,
             'target_segment_index': target_index,
-            'total_sentences': total_sentences
+            'total_segments': len(context_segments),
+            'truncated': False
         }
     
     def _search_in_segments(self, segments: List[Dict], query: str) -> List[int]:
@@ -195,7 +213,7 @@ class TranscriptionSearcher:
         
         return score
     
-    def search(self, query: str, limit: int = 10, offset: int = 0, sources: List[str] = None) -> Dict[str, Any]:
+    def search(self, query: str, limit: int = 10, offset: int = 0, sources: List[str] = None, context_duration: float = 60.0) -> Dict[str, Any]:
         """
         Recherche principale
         
@@ -204,6 +222,7 @@ class TranscriptionSearcher:
             limit: Nombre de résultats à retourner par page
             offset: Position de départ pour la pagination
             sources: Liste des noms de fichiers sources à inclure (None = tous)
+            context_duration: Durée max du contexte en secondes (défaut: 60s)
         
         Returns:
             Dictionnaire avec les résultats de recherche
@@ -241,7 +260,7 @@ class TranscriptionSearcher:
             
             # Pour chaque correspondance, créer un résultat avec contexte
             for idx in matching_indices:
-                context = self._get_segment_context(segments, idx, max_sentences=5)
+                context = self._get_segment_context(segments, idx, max_duration=context_duration)
                 
                 # Récupérer les métadonnées du fichier source
                 metadata = data.get('metadata', {})
@@ -294,14 +313,15 @@ def main():
     if len(sys.argv) < 2:
         print(json.dumps({
             'success': False,
-            'error': 'Usage: search_transcriptions.py <query> [limit] [offset] [sources]'
+            'error': 'Usage: search_transcriptions.py <query> [limit] [offset] [sources] [context_duration]'
         }))
         sys.exit(1)
     
     query = sys.argv[1]
     limit = int(sys.argv[2]) if len(sys.argv) > 2 else 10
     offset = int(sys.argv[3]) if len(sys.argv) > 3 else 0
-    sources = sys.argv[4].split(',') if len(sys.argv) > 4 else None
+    sources = sys.argv[4].split(',') if len(sys.argv) > 4 and sys.argv[4] else None
+    context_duration = float(sys.argv[5]) if len(sys.argv) > 5 else 60.0
     
     # Déterminer le chemin du répertoire de transcription
     script_dir = Path(__file__).parent
@@ -312,7 +332,7 @@ def main():
     searcher = TranscriptionSearcher(str(transcription_dir))
     
     # Effectuer la recherche
-    results = searcher.search(query, limit, offset, sources)
+    results = searcher.search(query, limit, offset, sources, context_duration)
     
     # Retourner les résultats en JSON
     print(json.dumps(results, ensure_ascii=False, indent=2))

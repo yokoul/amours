@@ -143,6 +143,7 @@ class PoeticServer {
                 const limit = parseInt(req.query.limit) || 10;
                 const offset = parseInt(req.query.offset) || 0;
                 const sources = req.query.sources ? req.query.sources.split(',') : [];
+                const contextDuration = parseFloat(req.query.context_duration) || 60.0;
                 
                 if (!query || query.trim().length < 2) {
                     return res.status(400).json({ 
@@ -152,7 +153,7 @@ class PoeticServer {
                 
                 console.log(`🔍 Recherche: "${query}" (limit: ${limit}, offset: ${offset}, sources: ${sources.length > 0 ? sources.join(', ') : 'toutes'})`);
                 
-                const results = await this.searchTranscriptions(query, limit, offset, sources);
+                const results = await this.searchTranscriptions(query, limit, offset, sources, contextDuration);
                 res.json(results);
                 
             } catch (error) {
@@ -878,16 +879,17 @@ class PoeticServer {
        RECHERCHE DANS LES TRANSCRIPTIONS
        =========================== */
     
-    async searchTranscriptions(query, limit = 10, offset = 0, sources = []) {
+    async searchTranscriptions(query, limit = 10, offset = 0, sources = [], contextDuration = 60.0) {
         return new Promise((resolve, reject) => {
             const script = path.join(__dirname, 'search_transcriptions.py');
             
             const pythonArgs = [script, query, limit.toString(), offset.toString()];
             
-            // Ajouter les sources si spécifiées
-            if (sources.length > 0) {
-                pythonArgs.push(sources.join(','));
-            }
+            // Ajouter les sources si spécifiées, sinon une chaîne vide
+            pythonArgs.push(sources.length > 0 ? sources.join(',') : '');
+            
+            // Ajouter la durée du contexte
+            pythonArgs.push(contextDuration.toString());
             
             const python = spawn(this.pythonPath, pythonArgs, {
                 cwd: this.projectRoot,

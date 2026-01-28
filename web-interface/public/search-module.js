@@ -11,6 +11,8 @@ class SearchModule {
         this.searchInfo = document.getElementById('search-info');
         this.searchLoading = document.getElementById('search-loading');
         this.closeBtn = document.getElementById('close-search');
+        this.contextDurationSlider = document.getElementById('context-duration-slider');
+        this.contextDurationValue = document.getElementById('context-duration-value');
         
         this.currentAudio = null;
         this.currentPlayBtn = null;
@@ -28,6 +30,9 @@ class SearchModule {
         // Filtres
         this.availableSources = [];
         this.selectedSources = new Set(); // Ensemble des sources sélectionnées
+        
+        // Durée du contexte (en secondes)
+        this.contextDuration = 60;
         
         this.init();
     }
@@ -50,6 +55,22 @@ class SearchModule {
             }
         });
         
+        // Gestion du slider de durée
+        if (this.contextDurationSlider) {
+            this.contextDurationSlider.addEventListener('input', (e) => {
+                this.contextDuration = parseInt(e.target.value);
+                this.contextDurationValue.textContent = this.contextDuration;
+            });
+            
+            // Déclencher une recherche si une recherche était en cours
+            this.contextDurationSlider.addEventListener('change', () => {
+                if (this.currentQuery) {
+                    this.currentPage = 1;
+                    this.performSearch();
+                }
+            });
+        }
+        
         // Gestion du bouton filtre/reset
         const filterToggleBtn = document.getElementById('filter-toggle-btn');
         if (filterToggleBtn) {
@@ -57,8 +78,18 @@ class SearchModule {
                 if (filterToggleBtn.classList.contains('reset-mode')) {
                     // Mode reset : réinitialiser tout
                     this.resetSearch();
+                } else {
+                    // Mode filtre : basculer l'affichage des filtres
+                    this.toggleFilters();
+                    
+                    // Mettre à jour l'icône
+                    const filtersPanel = document.getElementById('search-filters');
+                    if (filtersPanel && filtersPanel.classList.contains('open')) {
+                        filterToggleBtn.textContent = '×';
+                    } else {
+                        filterToggleBtn.textContent = '⚙︎';
+                    }
                 }
-                // Sinon c'est juste l'icône filtre, pas d'action
             });
         }
         
@@ -94,6 +125,13 @@ class SearchModule {
         if (this.animationFrameId) {
             cancelAnimationFrame(this.animationFrameId);
             this.animationFrameId = null;
+        }
+    }
+    
+    toggleFilters() {
+        const filtersPanel = document.getElementById('search-filters');
+        if (filtersPanel) {
+            filtersPanel.classList.toggle('open');
         }
     }
     
@@ -265,6 +303,9 @@ class SearchModule {
         try {
             const offset = (this.currentPage - 1) * this.resultsPerPage;
             let url = `/api/search?q=${encodeURIComponent(query)}&limit=${this.resultsPerPage}&offset=${offset}`;
+            
+            // Ajouter la durée du contexte
+            url += `&context_duration=${this.contextDuration}`;
             
             // Ajouter les sources sélectionnées
             if (this.selectedSources.size > 0 && this.selectedSources.size < this.availableSources.length) {

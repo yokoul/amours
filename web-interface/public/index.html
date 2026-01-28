@@ -105,14 +105,33 @@
             </header>
             <div class="search-content">
                 <div class="search-input-area">
-                    <input 
-                        type="text" 
-                        id="search-input" 
-                        placeholder="mots-clés ou phrase..."
-                        autocomplete="off"
-                    >
+                    <div class="search-input-wrapper">
+                        <input 
+                            type="text" 
+                            id="search-input" 
+                            placeholder="mots-clés ou phrase..."
+                            autocomplete="off"
+                        >
+                        <span class="search-enter-hint">↵</span>
+                    </div>
                     <button class="filter-toggle-btn" id="filter-toggle-btn" title="Filtrer par source">⚙︎</button>
                 </div>
+                
+                <!-- Contrôle de la durée du contexte -->
+                <div class="context-duration-control">
+                    <div class="context-icon">〈〉</div>
+                    <input 
+                        type="range" 
+                        id="context-duration-slider" 
+                        min="15" 
+                        max="180" 
+                        value="60" 
+                        step="15"
+                        title="Durée du contexte"
+                    >
+                    <span class="context-value" id="context-duration-value">60</span>
+                </div>
+                
                 <div class="search-filters" id="search-filters">
                     <div id="source-filters" class="source-filters">
                         <!-- Filtres générés dynamiquement -->
