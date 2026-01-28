@@ -72,9 +72,6 @@ body {
     overflow-x: hidden;
     overflow-y: auto;
     touch-action: manipulation;
-    -webkit-touch-callout: none;
-    -webkit-user-select: none;
-    user-select: none;
 }
 
 /* ===========================
@@ -612,6 +609,8 @@ body {
     flex-wrap: wrap;
     white-space: pre-wrap;
     word-break: break-word;
+    -webkit-user-select: text;
+    user-select: text;
 }
 
 .karaoke-word {
@@ -1051,6 +1050,8 @@ body {
     font-size: 16px;
     line-height: 1.6;
     font-weight: 300;
+    -webkit-user-select: text;
+    user-select: text;
 }
 
 /* ===========================
@@ -1234,6 +1235,8 @@ body {
     font-weight: 300;
     color: var(--black);
     margin-bottom: var(--space-s);
+    -webkit-user-select: text;
+    user-select: text;
 }
 
 .result-text mark {
@@ -1486,11 +1489,22 @@ body {
 }
 
 /* Touch feedback sur iOS */
+/* Désactiver sélection sur les contrôles d'interface */
 .word-item,
 .generate-btn,
 .play-btn,
-.nav-btn {
+.nav-btn,
+.theme-toggle-btn,
+.length-btn,
+.result-play-btn,
+.result-download-btn,
+.timeline-download-btn,
+.pulse-circle,
+.invitation,
+.vertical-title {
     -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
 }
 
 .word-item:active,
