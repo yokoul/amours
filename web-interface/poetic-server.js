@@ -142,6 +142,7 @@ class PoeticServer {
                 const query = req.query.q || req.query.query;
                 const limit = parseInt(req.query.limit) || 10;
                 const offset = parseInt(req.query.offset) || 0;
+                const sources = req.query.sources ? req.query.sources.split(',') : [];
                 
                 if (!query || query.trim().length < 2) {
                     return res.status(400).json({ 
@@ -149,15 +150,32 @@ class PoeticServer {
                     });
                 }
                 
-                console.log(`🔍 Recherche: "${query}" (limit: ${limit}, offset: ${offset})`);
+                console.log(`🔍 Recherche: "${query}" (limit: ${limit}, offset: ${offset}, sources: ${sources.length > 0 ? sources.join(', ') : 'toutes'})`);
                 
-                const results = await this.searchTranscriptions(query, limit, offset);
+                const results = await this.searchTranscriptions(query, limit, offset, sources);
                 res.json(results);
                 
             } catch (error) {
                 console.error('Erreur recherche:', error);
                 res.status(500).json({ 
                     error: 'Erreur lors de la recherche',
+                    details: error.message 
+                });
+            }
+        });
+        
+        // API pour obtenir les sources disponibles
+        this.app.get('/api/search-sources', async (req, res) => {
+            try {
+                const sources = await this.getAvailableSources();
+                res.json({
+                    success: true,
+                    sources: sources
+                });
+            } catch (error) {
+                console.error('Erreur récupération sources:', error);
+                res.status(500).json({ 
+                    error: 'Erreur lors de la récupération des sources',
                     details: error.message 
                 });
             }
@@ -860,11 +878,16 @@ class PoeticServer {
        RECHERCHE DANS LES TRANSCRIPTIONS
        =========================== */
     
-    async searchTranscriptions(query, limit = 10, offset = 0) {
+    async searchTranscriptions(query, limit = 10, offset = 0, sources = []) {
         return new Promise((resolve, reject) => {
             const script = path.join(__dirname, 'search_transcriptions.py');
             
             const pythonArgs = [script, query, limit.toString(), offset.toString()];
+            
+            // Ajouter les sources si spécifiées
+            if (sources.length > 0) {
+                pythonArgs.push(sources.join(','));
+            }
             
             const python = spawn(this.pythonPath, pythonArgs, {
                 cwd: this.projectRoot,
@@ -903,6 +926,26 @@ class PoeticServer {
                     reject(new Error('Erreur de parsing de la réponse de recherche'));
                 }
             });
+        });
+    }
+    
+    async getAvailableSources() {
+        return new Promise((resolve, reject) => {
+            const fs = require('fs');
+            const transcriptionDir = path.join(this.projectRoot, 'output_transcription');
+            
+            try {
+                const files = fs.readdirSync(transcriptionDir);
+                const sources = files
+                    .filter(file => file.endsWith('_with_speakers_complete.json'))
+                    .map(file => file.replace('_with_speakers_complete.json', ''))
+                    .sort();
+                
+                resolve(sources);
+            } catch (error) {
+                console.error('Erreur lecture sources:', error);
+                reject(error);
+            }
         });
     }
     

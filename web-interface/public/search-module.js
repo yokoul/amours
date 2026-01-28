@@ -25,6 +25,10 @@ class SearchModule {
         this.totalResults = 0;
         this.currentQuery = '';
         
+        // Filtres
+        this.availableSources = [];
+        this.selectedSources = new Set(); // Ensemble des sources sélectionnées
+        
         this.init();
     }
     
@@ -49,9 +53,14 @@ class SearchModule {
         console.log('🔍 Module de recherche initialisé');
     }
     
-    open() {
+    async open() {
         this.panel.classList.add('open');
         this.isOpen = true;
+        
+        // Charger les sources disponibles si ce n'est pas déjà fait
+        if (this.availableSources.length === 0) {
+            await this.loadAvailableSources();
+        }
         
         // Focus sur le champ de recherche
         setTimeout(() => {
@@ -74,6 +83,83 @@ class SearchModule {
             cancelAnimationFrame(this.animationFrameId);
             this.animationFrameId = null;
         }
+    }
+    
+    async loadAvailableSources() {
+        try {
+            const response = await fetch('/api/search-sources');
+            const data = await response.json();
+            
+            if (data.success && data.sources) {
+                this.availableSources = data.sources;
+                this.renderSourceFilters();
+            }
+        } catch (error) {
+            console.error('Erreur chargement sources:', error);
+        }
+    }
+    
+    renderSourceFilters() {
+        const filterContainer = document.getElementById('source-filters');
+        if (!filterContainer) return;
+        
+        filterContainer.innerHTML = '';
+        
+        // Bouton "Tout sélectionner / Tout désélectionner"
+        const toggleAllBtn = document.createElement('button');
+        toggleAllBtn.className = 'filter-toggle-all';
+        toggleAllBtn.textContent = 'Tout sélectionner';
+        toggleAllBtn.addEventListener('click', () => {
+            if (this.selectedSources.size === this.availableSources.length) {
+                // Tout désélectionner
+                this.selectedSources.clear();
+                toggleAllBtn.textContent = 'Tout sélectionner';
+                filterContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
+            } else {
+                // Tout sélectionner
+                this.availableSources.forEach(source => this.selectedSources.add(source));
+                toggleAllBtn.textContent = 'Tout désélectionner';
+                filterContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
+            }
+        });
+        filterContainer.appendChild(toggleAllBtn);
+        
+        // Liste des sources
+        const sourceList = document.createElement('div');
+        sourceList.className = 'source-list';
+        
+        this.availableSources.forEach(source => {
+            const label = document.createElement('label');
+            label.className = 'source-filter-item';
+            
+            const checkbox = document.createElement('input');
+            checkbox.type = 'checkbox';
+            checkbox.value = source;
+            checkbox.checked = this.selectedSources.has(source);
+            checkbox.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    this.selectedSources.add(source);
+                } else {
+                    this.selectedSources.delete(source);
+                }
+                
+                // Mettre à jour le bouton toggle
+                if (this.selectedSources.size === this.availableSources.length) {
+                    toggleAllBtn.textContent = 'Tout désélectionner';
+                } else {
+                    toggleAllBtn.textContent = 'Tout sélectionner';
+                }
+            });
+            
+            const span = document.createElement('span');
+            span.textContent = source;
+            
+            label.appendChild(checkbox);
+            label.appendChild(span);
+            sourceList.appendChild(label);
+        });
+        
+        filterContainer.appendChild(sourceList);
     }
     
     async performSearch(page = null) {
@@ -105,7 +191,14 @@ class SearchModule {
         
         try {
             const offset = (this.currentPage - 1) * this.resultsPerPage;
-            const url = `/api/search?q=${encodeURIComponent(query)}&limit=${this.resultsPerPage}&offset=${offset}`;
+            let url = `/api/search?q=${encodeURIComponent(query)}&limit=${this.resultsPerPage}&offset=${offset}`;
+            
+            // Ajouter les sources sélectionnées
+            if (this.selectedSources.size > 0 && this.selectedSources.size < this.availableSources.length) {
+                const sources = Array.from(this.selectedSources).join(',');
+                url += `&sources=${encodeURIComponent(sources)}`;
+            }
+            
             const response = await fetch(url);
             const data = await response.json();
             

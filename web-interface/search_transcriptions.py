@@ -195,7 +195,7 @@ class TranscriptionSearcher:
         
         return score
     
-    def search(self, query: str, limit: int = 10, offset: int = 0) -> Dict[str, Any]:
+    def search(self, query: str, limit: int = 10, offset: int = 0, sources: List[str] = None) -> Dict[str, Any]:
         """
         Recherche principale
         
@@ -203,6 +203,7 @@ class TranscriptionSearcher:
             query: Texte à rechercher (mots-clés ou phrase)
             limit: Nombre de résultats à retourner par page
             offset: Position de départ pour la pagination
+            sources: Liste des noms de fichiers sources à inclure (None = tous)
         
         Returns:
             Dictionnaire avec les résultats de recherche
@@ -215,12 +216,20 @@ class TranscriptionSearcher:
             }
         
         query = query.strip()
-        print(f"🔍 Recherche de: '{query}' (limit: {limit}, offset: {offset})", file=sys.stderr)
+        sources_info = f" (sources: {', '.join(sources)})" if sources else ""
+        print(f"🔍 Recherche de: '{query}' (limit: {limit}, offset: {offset}){sources_info}", file=sys.stderr)
         
         all_results = []
         
         # Parcourir toutes les transcriptions
         for trans in self.transcriptions:
+            # Filtrer par sources si spécifié
+            if sources:
+                # Extraire le nom du fichier sans l'extension
+                trans_name = trans['file'].replace('_with_speakers_complete', '')
+                if trans_name not in sources:
+                    continue
+            
             data = trans['data']
             segments = data.get('transcription', {}).get('segments', [])
             
@@ -285,13 +294,14 @@ def main():
     if len(sys.argv) < 2:
         print(json.dumps({
             'success': False,
-            'error': 'Usage: search_transcriptions.py <query> [limit] [offset]'
+            'error': 'Usage: search_transcriptions.py <query> [limit] [offset] [sources]'
         }))
         sys.exit(1)
     
     query = sys.argv[1]
     limit = int(sys.argv[2]) if len(sys.argv) > 2 else 10
     offset = int(sys.argv[3]) if len(sys.argv) > 3 else 0
+    sources = sys.argv[4].split(',') if len(sys.argv) > 4 else None
     
     # Déterminer le chemin du répertoire de transcription
     script_dir = Path(__file__).parent
@@ -302,7 +312,7 @@ def main():
     searcher = TranscriptionSearcher(str(transcription_dir))
     
     # Effectuer la recherche
-    results = searcher.search(query, limit, offset)
+    results = searcher.search(query, limit, offset, sources)
     
     # Retourner les résultats en JSON
     print(json.dumps(results, ensure_ascii=False, indent=2))
