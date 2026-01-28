@@ -15,6 +15,7 @@ class SearchModule {
         this.currentAudio = null;
         this.currentPlayBtn = null;
         this.currentTextContainer = null; // Pour l'animation karaoké
+        this.animationFrameId = null; // Pour optimiser l'animation
         this.isOpen = false;
         
         this.init();
@@ -69,6 +70,12 @@ class SearchModule {
         if (this.currentAudio) {
             this.currentAudio.pause();
             this.currentAudio = null;
+        }
+        
+        // Annuler toute animation en cours
+        if (this.animationFrameId) {
+            cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
         }
     }
     
@@ -156,6 +163,9 @@ class SearchModule {
         const textContainer = resultDiv.querySelector('.result-text');
         this.renderKaraokeText(textContainer, result, query);
         
+        // Stocker les mots karaoké pour optimiser l'animation
+        textContainer._karaokeWords = textContainer.querySelectorAll('.karaoke-word');
+        
         // Configuration du player
         const playBtn = resultDiv.querySelector('.result-play-btn');
         this.setupPlayer(playBtn, result, textContainer);
@@ -241,9 +251,13 @@ class SearchModule {
                         this.currentPlayBtn.classList.remove('playing');
                     }
                     // Réinitialiser l'animation karaoké du précédent
-                    if (this.currentTextContainer) {
-                        const prevWords = this.currentTextContainer.querySelectorAll('.karaoke-word');
-                        prevWords.forEach(w => w.classList.remove('active'));
+                    if (this.currentTextContainer && this.currentTextContainer._karaokeWords) {
+                        this.currentTextContainer._karaokeWords.forEach(w => w.classList.remove('active'));
+                    }
+                    // Annuler l'animation frame en cours
+                    if (this.animationFrameId) {
+                        cancelAnimationFrame(this.animationFrameId);
+                        this.animationFrameId = null;
                     }
                 }
                 
@@ -260,13 +274,36 @@ class SearchModule {
                 audio.pause();
                 playBtn.innerHTML = '<span class="play-symbol">▶</span>';
                 playBtn.classList.remove('playing');
+                
+                // Annuler l'animation frame
+                if (this.animationFrameId) {
+                    cancelAnimationFrame(this.animationFrameId);
+                    this.animationFrameId = null;
+                }
             }
         });
         
-        // Animation karaoké et arrêt à la fin de l'extrait
+        // Animation karaoké avec requestAnimationFrame pour optimiser
+        let lastUpdateTime = 0;
+        const updateInterval = 100; // Mise à jour max toutes les 100ms
+        
         audio.addEventListener('timeupdate', () => {
-            // Animer le karaoké
-            this.animateResultKaraoke(audio.currentTime, textContainer);
+            const now = Date.now();
+            
+            // Throttle: ne mettre à jour que toutes les 100ms
+            if (now - lastUpdateTime < updateInterval) {
+                return;
+            }
+            lastUpdateTime = now;
+            
+            // Utiliser requestAnimationFrame pour l'animation
+            if (this.animationFrameId) {
+                cancelAnimationFrame(this.animationFrameId);
+            }
+            
+            this.animationFrameId = requestAnimationFrame(() => {
+                this.animateResultKaraoke(audio.currentTime, textContainer);
+            });
             
             // Arrêter à la fin de l'extrait
             if (audio.currentTime >= endTime) {
@@ -276,8 +313,14 @@ class SearchModule {
                 playBtn.classList.remove('playing');
                 
                 // Réinitialiser l'animation karaoké
-                const words = textContainer.querySelectorAll('.karaoke-word');
-                words.forEach(w => w.classList.remove('active'));
+                if (textContainer._karaokeWords) {
+                    textContainer._karaokeWords.forEach(w => w.classList.remove('active'));
+                }
+                
+                if (this.animationFrameId) {
+                    cancelAnimationFrame(this.animationFrameId);
+                    this.animationFrameId = null;
+                }
             }
         });
         
@@ -290,18 +333,24 @@ class SearchModule {
     }
     
     animateResultKaraoke(currentTime, textContainer) {
-        const words = textContainer.querySelectorAll('.karaoke-word');
+        // Utiliser les mots pré-stockés pour éviter querySelectorAll
+        const words = textContainer._karaokeWords;
         
-        if (words.length === 0) return;
+        if (!words || words.length === 0) return;
         
+        // Optimisation: ne parcourir que les mots visibles
         words.forEach(word => {
-            const start = parseFloat(word.getAttribute('data-start'));
-            const end = parseFloat(word.getAttribute('data-end'));
+            const start = parseFloat(word.dataset.start);
+            const end = parseFloat(word.dataset.end);
             
             if (currentTime >= start && currentTime <= end) {
-                word.classList.add('active');
+                if (!word.classList.contains('active')) {
+                    word.classList.add('active');
+                }
             } else {
-                word.classList.remove('active');
+                if (word.classList.contains('active')) {
+                    word.classList.remove('active');
+                }
             }
         });
     }
