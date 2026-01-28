@@ -55,8 +55,30 @@ class SearchModule {
         const searchFilters = document.getElementById('search-filters');
         if (filterToggleBtn && searchFilters) {
             filterToggleBtn.addEventListener('click', () => {
-                searchFilters.classList.toggle('collapsed');
-                filterToggleBtn.classList.toggle('active');
+                const isCollapsed = searchFilters.classList.contains('collapsed');
+                
+                if (isCollapsed) {
+                    // Déployer : calculer la hauteur réelle
+                    searchFilters.classList.remove('collapsed');
+                    const height = searchFilters.scrollHeight;
+                    searchFilters.style.maxHeight = '0px';
+                    // Force reflow
+                    searchFilters.offsetHeight;
+                    searchFilters.style.maxHeight = height + 'px';
+                    filterToggleBtn.classList.add('active');
+                } else {
+                    // Replier
+                    searchFilters.style.maxHeight = searchFilters.scrollHeight + 'px';
+                    // Force reflow
+                    searchFilters.offsetHeight;
+                    searchFilters.style.maxHeight = '0px';
+                    filterToggleBtn.classList.remove('active');
+                    
+                    // Ajouter la classe collapsed après la transition
+                    setTimeout(() => {
+                        searchFilters.classList.add('collapsed');
+                    }, 400);
+                }
             });
         }
         

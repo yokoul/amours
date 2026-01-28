@@ -1208,21 +1208,21 @@ body {
 
 /* Filtres de recherche */
 .search-filters {
-    max-height: 300px;
-    overflow-y: auto;
-    transition: max-height var(--medium-transition);
+    overflow: hidden;
+    transition: max-height 0.4s ease-out;
     border-bottom: 1px solid var(--grey-light);
     background: var(--grey-light);
 }
 
 .search-filters.collapsed {
-    max-height: 0;
-    overflow: hidden;
+    max-height: 0 !important;
     border-bottom: none;
 }
 
 .source-filters {
     padding: var(--space-s) var(--space-m);
+    max-height: 250px;
+    overflow-y: auto;
 }
 
 .filter-toggle-all {
