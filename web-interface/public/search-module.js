@@ -52,10 +52,10 @@ class SearchModule {
         
         // Gestion du repliage du filtre
         const filterToggleBtn = document.getElementById('filter-toggle-btn');
-        const sourceFilters = document.getElementById('source-filters');
-        if (filterToggleBtn && sourceFilters) {
+        const searchFilters = document.getElementById('search-filters');
+        if (filterToggleBtn && searchFilters) {
             filterToggleBtn.addEventListener('click', () => {
-                sourceFilters.classList.toggle('collapsed');
+                searchFilters.classList.toggle('collapsed');
                 filterToggleBtn.classList.toggle('active');
             });
         }
@@ -118,19 +118,20 @@ class SearchModule {
         // Bouton "Tout sélectionner / Tout désélectionner"
         const toggleAllBtn = document.createElement('button');
         toggleAllBtn.className = 'filter-toggle-all';
-        toggleAllBtn.textContent = 'Tout sélectionner';
+        toggleAllBtn.textContent = 'tout sélectionner';
         toggleAllBtn.addEventListener('click', () => {
             if (this.selectedSources.size === this.availableSources.length) {
                 // Tout désélectionner
                 this.selectedSources.clear();
-                toggleAllBtn.textContent = 'Tout sélectionner';
+                toggleAllBtn.textContent = 'tout sélectionner';
                 filterContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = false);
             } else {
                 // Tout sélectionner
                 this.availableSources.forEach(source => this.selectedSources.add(source));
-                toggleAllBtn.textContent = 'Tout désélectionner';
+                toggleAllBtn.textContent = 'tout désélectionner';
                 filterContainer.querySelectorAll('input[type="checkbox"]').forEach(cb => cb.checked = true);
             }
+            this.updateFilterButtonState();
         });
         filterContainer.appendChild(toggleAllBtn);
         
@@ -147,6 +148,14 @@ class SearchModule {
             checkbox.value = source;
             checkbox.checked = this.selectedSources.has(source);
             checkbox.addEventListener('change', (e) => {
+                // Déployer automatiquement si replié
+                const searchFilters = document.getElementById('search-filters');
+                const filterToggleBtn = document.getElementById('filter-toggle-btn');
+                if (searchFilters && searchFilters.classList.contains('collapsed')) {
+                    searchFilters.classList.remove('collapsed');
+                    if (filterToggleBtn) filterToggleBtn.classList.add('active');
+                }
+                
                 if (e.target.checked) {
                     this.selectedSources.add(source);
                 } else {
@@ -155,10 +164,12 @@ class SearchModule {
                 
                 // Mettre à jour le bouton toggle
                 if (this.selectedSources.size === this.availableSources.length) {
-                    toggleAllBtn.textContent = 'Tout désélectionner';
+                    toggleAllBtn.textContent = 'tout désélectionner';
                 } else {
-                    toggleAllBtn.textContent = 'Tout sélectionner';
+                    toggleAllBtn.textContent = 'tout sélectionner';
                 }
+                
+                this.updateFilterButtonState();
             });
             
             const span = document.createElement('span');
@@ -170,6 +181,20 @@ class SearchModule {
         });
         
         filterContainer.appendChild(sourceList);
+    }
+    
+    updateFilterButtonState() {
+        const filterToggleBtn = document.getElementById('filter-toggle-btn');
+        if (!filterToggleBtn) return;
+        
+        // Mettre en évidence si des filtres sont actifs
+        if (this.selectedSources.size > 0 && this.selectedSources.size < this.availableSources.length) {
+            filterToggleBtn.style.opacity = '1';
+            filterToggleBtn.style.borderColor = 'var(--black)';
+        } else {
+            filterToggleBtn.style.opacity = '';
+            filterToggleBtn.style.borderColor = '';
+        }
     }
     
     async performSearch(page = null) {

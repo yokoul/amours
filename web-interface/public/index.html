@@ -111,13 +111,10 @@
                         placeholder="mots-clés ou phrase..."
                         autocomplete="off"
                     >
+                    <button class="filter-toggle-btn" id="filter-toggle-btn" title="Filtrer par source">⚙︎</button>
                 </div>
-                <div class="search-filters">
-                    <div class="filter-header">
-                        <span class="filter-title">Filtrer par source</span>
-                        <button class="filter-toggle-btn" id="filter-toggle-btn">⚙︎</button>
-                    </div>
-                    <div id="source-filters" class="source-filters collapsed">
+                <div class="search-filters collapsed" id="search-filters">
+                    <div id="source-filters" class="source-filters">
                         <!-- Filtres générés dynamiquement -->
                     </div>
                 </div>
