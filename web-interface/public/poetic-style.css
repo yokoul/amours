@@ -1208,18 +1208,16 @@ body {
 
 /* Filtres de recherche */
 .search-filters {
-    max-height: 250px;
-    overflow: hidden;
+    max-height: 300px;
+    overflow-y: auto;
     transition: max-height var(--medium-transition);
     border-bottom: 1px solid var(--grey-light);
     background: var(--grey-light);
-    position: sticky;
-    top: 72px; /* Hauteur approximative de search-input-area */
-    z-index: 9;
 }
 
 .search-filters.collapsed {
     max-height: 0;
+    overflow: hidden;
     border-bottom: none;
 }
 
@@ -1298,7 +1296,7 @@ body {
     font-size: 12px;
     color: var(--grey-dark);
     letter-spacing: 0.5px;
-    background: var(--grey-light);
+    background: var(--white);
     border-bottom: 1px solid var(--grey-light);
 }
 
