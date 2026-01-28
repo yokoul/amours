@@ -50,6 +50,16 @@ class SearchModule {
             }
         });
         
+        // Gestion du repliage du filtre
+        const filterToggleBtn = document.getElementById('filter-toggle-btn');
+        const sourceFilters = document.getElementById('source-filters');
+        if (filterToggleBtn && sourceFilters) {
+            filterToggleBtn.addEventListener('click', () => {
+                sourceFilters.classList.toggle('collapsed');
+                filterToggleBtn.classList.toggle('active');
+            });
+        }
+        
         console.log('🔍 Module de recherche initialisé');
     }
     
