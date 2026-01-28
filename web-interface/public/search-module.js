@@ -14,6 +14,7 @@ class SearchModule {
         
         this.currentAudio = null;
         this.currentPlayBtn = null;
+        this.currentTextContainer = null; // Pour l'animation karaoké
         this.isOpen = false;
         
         this.init();
@@ -136,15 +137,12 @@ class SearchModule {
         // Nom du fichier sans extension
         const fileName = result.source_file.replace(/\.[^/.]+$/, '');
         
-        // Surligner la requête
-        const highlightedText = this.highlightQuery(result.context_text, query);
-        
         resultDiv.innerHTML = `
             <div class="result-header">
                 <div class="result-source">${fileName}</div>
                 <div class="result-speaker">${result.speaker}</div>
             </div>
-            <div class="result-text">${highlightedText}</div>
+            <div class="result-text" data-result-index="${index}"></div>
             <div class="result-footer">
                 <div class="result-time">${startTime} → ${endTime} (${duration})</div>
                 <div class="result-player">
@@ -154,9 +152,13 @@ class SearchModule {
             </div>
         `;
         
+        // Créer l'affichage karaoké du texte
+        const textContainer = resultDiv.querySelector('.result-text');
+        this.renderKaraokeText(textContainer, result, query);
+        
         // Configuration du player
         const playBtn = resultDiv.querySelector('.result-play-btn');
-        this.setupPlayer(playBtn, result);
+        this.setupPlayer(playBtn, result, textContainer);
         
         // Configuration du téléchargement
         const downloadBtn = resultDiv.querySelector('.result-download-btn');
@@ -165,7 +167,63 @@ class SearchModule {
         return resultDiv;
     }
     
-    setupPlayer(playBtn, result) {
+    renderKaraokeText(container, result, query) {
+        container.innerHTML = '';
+        
+        // Vérifier si on a des données word-level dans les segments
+        const segments = result.context_segments || [];
+        let hasWordData = false;
+        
+        segments.forEach((segment, segIndex) => {
+            if (segment.words && segment.words.length > 0) {
+                hasWordData = true;
+                
+                // Créer un span pour chaque mot
+                segment.words.forEach((wordObj, wordIndex) => {
+                    const wordSpan = document.createElement('span');
+                    wordSpan.className = 'karaoke-word';
+                    wordSpan.textContent = wordObj.word;
+                    wordSpan.setAttribute('data-segment', segIndex);
+                    wordSpan.setAttribute('data-word', wordIndex);
+                    wordSpan.setAttribute('data-start', wordObj.start);
+                    wordSpan.setAttribute('data-end', wordObj.end);
+                    
+                    // Surligner si c'est le mot recherché
+                    if (query && wordObj.word.toLowerCase().includes(query.toLowerCase())) {
+                        wordSpan.style.fontWeight = '400';
+                        wordSpan.style.opacity = '1';
+                    }
+                    
+                    container.appendChild(wordSpan);
+                });
+                
+                // Ajouter un espace entre les segments
+                if (segIndex < segments.length - 1) {
+                    const space = document.createTextNode(' ');
+                    container.appendChild(space);
+                }
+            } else {
+                // Pas de données word-level, afficher le texte normal
+                const text = this.highlightQuery(segment.text, query);
+                const textSpan = document.createElement('span');
+                textSpan.innerHTML = text;
+                container.appendChild(textSpan);
+                
+                if (segIndex < segments.length - 1) {
+                    const space = document.createTextNode(' ');
+                    container.appendChild(space);
+                }
+            }
+        });
+        
+        // Si pas de segments ou pas de données word-level, fallback sur le texte complet
+        if (!hasWordData && segments.length === 0) {
+            const text = this.highlightQuery(result.context_text, query);
+            container.innerHTML = text;
+        }
+    }
+    
+    setupPlayer(playBtn, result, textContainer) {
         const audio = new Audio();
         const audioUrl = this.getAudioUrl(result.source_path);
         audio.src = audioUrl;
@@ -182,6 +240,11 @@ class SearchModule {
                         this.currentPlayBtn.innerHTML = '<span class="play-symbol">▶</span>';
                         this.currentPlayBtn.classList.remove('playing');
                     }
+                    // Réinitialiser l'animation karaoké du précédent
+                    if (this.currentTextContainer) {
+                        const prevWords = this.currentTextContainer.querySelectorAll('.karaoke-word');
+                        prevWords.forEach(w => w.classList.remove('active'));
+                    }
                 }
                 
                 // Démarrer la lecture
@@ -192,6 +255,7 @@ class SearchModule {
                 
                 this.currentAudio = audio;
                 this.currentPlayBtn = playBtn;
+                this.currentTextContainer = textContainer;
             } else {
                 audio.pause();
                 playBtn.innerHTML = '<span class="play-symbol">▶</span>';
@@ -199,13 +263,21 @@ class SearchModule {
             }
         });
         
-        // Arrêter à la fin de l'extrait
+        // Animation karaoké et arrêt à la fin de l'extrait
         audio.addEventListener('timeupdate', () => {
+            // Animer le karaoké
+            this.animateResultKaraoke(audio.currentTime, textContainer);
+            
+            // Arrêter à la fin de l'extrait
             if (audio.currentTime >= endTime) {
                 audio.pause();
                 audio.currentTime = startTime;
                 playBtn.innerHTML = '<span class="play-symbol">▶</span>';
                 playBtn.classList.remove('playing');
+                
+                // Réinitialiser l'animation karaoké
+                const words = textContainer.querySelectorAll('.karaoke-word');
+                words.forEach(w => w.classList.remove('active'));
             }
         });
         
@@ -214,6 +286,23 @@ class SearchModule {
             playBtn.disabled = true;
             playBtn.innerHTML = '<span class="play-symbol">✕</span>';
             playBtn.style.opacity = '0.3';
+        });
+    }
+    
+    animateResultKaraoke(currentTime, textContainer) {
+        const words = textContainer.querySelectorAll('.karaoke-word');
+        
+        if (words.length === 0) return;
+        
+        words.forEach(word => {
+            const start = parseFloat(word.getAttribute('data-start'));
+            const end = parseFloat(word.getAttribute('data-end'));
+            
+            if (currentTime >= start && currentTime <= end) {
+                word.classList.add('active');
+            } else {
+                word.classList.remove('active');
+            }
         });
     }
     
