@@ -19,6 +19,12 @@ class SearchModule {
         this.audioCache = new Map(); // Cache des extraits audio générés
         this.isOpen = false;
         
+        // Pagination
+        this.currentPage = 1;
+        this.resultsPerPage = 10;
+        this.totalResults = 0;
+        this.currentQuery = '';
+        
         this.init();
     }
     
@@ -32,22 +38,12 @@ class SearchModule {
         // Fermeture
         this.closeBtn.addEventListener('click', () => this.close());
         
-        // Recherche au Enter
+        // Recherche uniquement au Enter
         this.searchInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
+                this.currentPage = 1; // Réinitialiser à la page 1
                 this.performSearch();
             }
-        });
-        
-        // Recherche automatique après 500ms d'inactivité
-        let searchTimeout;
-        this.searchInput.addEventListener('input', () => {
-            clearTimeout(searchTimeout);
-            searchTimeout = setTimeout(() => {
-                if (this.searchInput.value.trim().length >= 2) {
-                    this.performSearch();
-                }
-            }, 500);
         });
         
         console.log('🔍 Module de recherche initialisé');
@@ -80,12 +76,23 @@ class SearchModule {
         }
     }
     
-    async performSearch() {
+    async performSearch(page = null) {
         const query = this.searchInput.value.trim();
         
         if (query.length < 2) {
             this.showError('Veuillez entrer au moins 2 caractères');
             return;
+        }
+        
+        // Si nouvelle requête, réinitialiser la page
+        if (query !== this.currentQuery) {
+            this.currentPage = 1;
+            this.currentQuery = query;
+        }
+        
+        // Si page spécifiée, l'utiliser
+        if (page !== null) {
+            this.currentPage = page;
         }
         
         // Arrêter tout audio en cours
@@ -97,13 +104,16 @@ class SearchModule {
         this.showLoading();
         
         try {
-            const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+            const offset = (this.currentPage - 1) * this.resultsPerPage;
+            const url = `/api/search?q=${encodeURIComponent(query)}&limit=${this.resultsPerPage}&offset=${offset}`;
+            const response = await fetch(url);
             const data = await response.json();
             
             if (!response.ok || !data.success) {
                 throw new Error(data.error || 'Erreur lors de la recherche');
             }
             
+            this.totalResults = data.total_results;
             this.displayResults(data);
             
         } catch (error) {
@@ -117,9 +127,13 @@ class SearchModule {
     displayResults(data) {
         this.searchResults.innerHTML = '';
         
-        // Afficher les informations
+        // Afficher les informations avec pagination
+        const totalPages = Math.ceil(this.totalResults / this.resultsPerPage);
+        const startResult = (this.currentPage - 1) * this.resultsPerPage + 1;
+        const endResult = Math.min(this.currentPage * this.resultsPerPage, this.totalResults);
+        
         this.searchInfo.style.display = 'block';
-        this.searchInfo.textContent = `${data.total_results} résultat${data.total_results > 1 ? 's' : ''} trouvé${data.total_results > 1 ? 's' : ''}`;
+        this.searchInfo.textContent = `${this.totalResults} résultat${this.totalResults > 1 ? 's' : ''} trouvé${this.totalResults > 1 ? 's' : ''} · Affichage ${startResult}-${endResult}`;
         
         if (data.results.length === 0) {
             this.showNoResults(data.query);
@@ -131,6 +145,11 @@ class SearchModule {
             const resultEl = this.createResultElement(result, index, data.query);
             this.searchResults.appendChild(resultEl);
         });
+        
+        // Ajouter la pagination si nécessaire
+        if (totalPages > 1) {
+            this.addPagination(totalPages);
+        }
     }
     
     createResultElement(result, index, query) {
@@ -474,6 +493,45 @@ class SearchModule {
         const mins = Math.floor(seconds / 60);
         const secs = Math.floor(seconds % 60);
         return `${mins}:${secs.toString().padStart(2, '0')}`;
+    }
+    
+    addPagination(totalPages) {
+        const paginationDiv = document.createElement('div');
+        paginationDiv.className = 'search-pagination';
+        
+        // Bouton précédent
+        const prevBtn = document.createElement('button');
+        prevBtn.className = 'pagination-btn';
+        prevBtn.textContent = '‹ Précédent';
+        prevBtn.disabled = this.currentPage === 1;
+        prevBtn.addEventListener('click', () => {
+            if (this.currentPage > 1) {
+                this.performSearch(this.currentPage - 1);
+                this.searchResults.scrollTop = 0;
+            }
+        });
+        paginationDiv.appendChild(prevBtn);
+        
+        // Indicateur de page
+        const pageInfo = document.createElement('span');
+        pageInfo.className = 'pagination-info';
+        pageInfo.textContent = `Page ${this.currentPage} / ${totalPages}`;
+        paginationDiv.appendChild(pageInfo);
+        
+        // Bouton suivant
+        const nextBtn = document.createElement('button');
+        nextBtn.className = 'pagination-btn';
+        nextBtn.textContent = 'Suivant ›';
+        nextBtn.disabled = this.currentPage === totalPages;
+        nextBtn.addEventListener('click', () => {
+            if (this.currentPage < totalPages) {
+                this.performSearch(this.currentPage + 1);
+                this.searchResults.scrollTop = 0;
+            }
+        });
+        paginationDiv.appendChild(nextBtn);
+        
+        this.searchResults.appendChild(paginationDiv);
     }
     
     showLoading() {

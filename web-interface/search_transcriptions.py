@@ -195,13 +195,14 @@ class TranscriptionSearcher:
         
         return score
     
-    def search(self, query: str, max_results: int = 50) -> Dict[str, Any]:
+    def search(self, query: str, limit: int = 10, offset: int = 0) -> Dict[str, Any]:
         """
         Recherche principale
         
         Args:
             query: Texte à rechercher (mots-clés ou phrase)
-            max_results: Nombre maximum de résultats à retourner
+            limit: Nombre de résultats à retourner par page
+            offset: Position de départ pour la pagination
         
         Returns:
             Dictionnaire avec les résultats de recherche
@@ -214,7 +215,7 @@ class TranscriptionSearcher:
             }
         
         query = query.strip()
-        print(f"🔍 Recherche de: '{query}'", file=sys.stderr)
+        print(f"🔍 Recherche de: '{query}' (limit: {limit}, offset: {offset})", file=sys.stderr)
         
         all_results = []
         
@@ -261,16 +262,21 @@ class TranscriptionSearcher:
         # Trier par pertinence décroissante
         all_results.sort(key=lambda x: x['relevance_score'], reverse=True)
         
-        # Limiter le nombre de résultats
-        results = all_results[:max_results]
+        # Appliquer la pagination
+        total_results = len(all_results)
+        start = offset
+        end = offset + limit
+        results = all_results[start:end]
         
-        print(f"✅ Trouvé {len(all_results)} résultats (retournant {len(results)})", file=sys.stderr)
+        print(f"✅ Trouvé {total_results} résultats (retournant {len(results)} depuis l'index {offset})", file=sys.stderr)
         
         return {
             'success': True,
             'query': query,
-            'total_results': len(all_results),
+            'total_results': total_results,
             'returned_results': len(results),
+            'offset': offset,
+            'limit': limit,
             'results': results
         }
 
@@ -279,12 +285,13 @@ def main():
     if len(sys.argv) < 2:
         print(json.dumps({
             'success': False,
-            'error': 'Usage: search_transcriptions.py <query> [max_results]'
+            'error': 'Usage: search_transcriptions.py <query> [limit] [offset]'
         }))
         sys.exit(1)
     
     query = sys.argv[1]
-    max_results = int(sys.argv[2]) if len(sys.argv) > 2 else 50
+    limit = int(sys.argv[2]) if len(sys.argv) > 2 else 10
+    offset = int(sys.argv[3]) if len(sys.argv) > 3 else 0
     
     # Déterminer le chemin du répertoire de transcription
     script_dir = Path(__file__).parent
@@ -295,7 +302,7 @@ def main():
     searcher = TranscriptionSearcher(str(transcription_dir))
     
     # Effectuer la recherche
-    results = searcher.search(query, max_results)
+    results = searcher.search(query, limit, offset)
     
     # Retourner les résultats en JSON
     print(json.dumps(results, ensure_ascii=False, indent=2))

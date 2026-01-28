@@ -140,7 +140,8 @@ class PoeticServer {
         this.app.get('/api/search', async (req, res) => {
             try {
                 const query = req.query.q || req.query.query;
-                const maxResults = parseInt(req.query.max) || 50;
+                const limit = parseInt(req.query.limit) || 10;
+                const offset = parseInt(req.query.offset) || 0;
                 
                 if (!query || query.trim().length < 2) {
                     return res.status(400).json({ 
@@ -148,9 +149,9 @@ class PoeticServer {
                     });
                 }
                 
-                console.log(`🔍 Recherche: "${query}" (max: ${maxResults})`);
+                console.log(`🔍 Recherche: "${query}" (limit: ${limit}, offset: ${offset})`);
                 
-                const results = await this.searchTranscriptions(query, maxResults);
+                const results = await this.searchTranscriptions(query, limit, offset);
                 res.json(results);
                 
             } catch (error) {
@@ -859,11 +860,11 @@ class PoeticServer {
        RECHERCHE DANS LES TRANSCRIPTIONS
        =========================== */
     
-    async searchTranscriptions(query, maxResults = 50) {
+    async searchTranscriptions(query, limit = 10, offset = 0) {
         return new Promise((resolve, reject) => {
             const script = path.join(__dirname, 'search_transcriptions.py');
             
-            const pythonArgs = [script, query, maxResults.toString()];
+            const pythonArgs = [script, query, limit.toString(), offset.toString()];
             
             const python = spawn(this.pythonPath, pythonArgs, {
                 cwd: this.projectRoot,
