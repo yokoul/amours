@@ -46,6 +46,11 @@ class PoeticServer {
             res.sendFile(path.join(__dirname, 'public', 'poetic-interface.html'));
         });
         
+        // Interface de recherche
+        this.app.get('/search', (req, res) => {
+            res.sendFile(path.join(__dirname, 'public', 'search-interface.html'));
+        });
+        
         // API pour récupération des mots
         this.app.get('/api/words', async (req, res) => {
             try {
@@ -136,10 +141,64 @@ class PoeticServer {
             }
         });
         
+        // API pour recherche dans les transcriptions
+        this.app.get('/api/search', async (req, res) => {
+            try {
+                const query = req.query.q || req.query.query;
+                const maxResults = parseInt(req.query.max) || 50;
+                
+                if (!query || query.trim().length < 2) {
+                    return res.status(400).json({ 
+                        error: 'La requête doit contenir au moins 2 caractères' 
+                    });
+                }
+                
+                console.log(`🔍 Recherche: "${query}" (max: ${maxResults})`);
+                
+                const results = await this.searchTranscriptions(query, maxResults);
+                res.json(results);
+                
+            } catch (error) {
+                console.error('Erreur recherche:', error);
+                res.status(500).json({ 
+                    error: 'Erreur lors de la recherche',
+                    details: error.message 
+                });
+            }
+        });
+        
+        // API pour extraire et télécharger un segment audio de recherche
+        this.app.post('/api/extract-search-audio', async (req, res) => {
+            try {
+                const { audio_path, start_time, end_time } = req.body;
+                
+                if (!audio_path || start_time === undefined || end_time === undefined) {
+                    return res.status(400).json({ 
+                        error: 'Paramètres manquants (audio_path, start_time, end_time requis)' 
+                    });
+                }
+                
+                console.log(`🎵 Extraction audio: ${audio_path} (${start_time}s → ${end_time}s)`);
+                
+                const result = await this.extractAudioSegment(audio_path, start_time, end_time);
+                res.json(result);
+                
+            } catch (error) {
+                console.error('Erreur extraction audio:', error);
+                res.status(500).json({ 
+                    error: 'Erreur lors de l\'extraction audio',
+                    details: error.message 
+                });
+            }
+        });
+        
         // Servir les fichiers audio générés (montages et extraits individuels)
         // Les montages sont dans output_mix_play, les extraits dans web-interface/public/audio
         this.app.use('/audio', express.static(path.join(this.projectRoot, 'output_mix_play')));
         this.app.use('/audio', express.static(path.join(__dirname, 'public', 'audio')));
+        
+        // Servir les fichiers audio sources (pour les extraits de recherche)
+        this.app.use('/audio-sources', express.static(path.join(this.projectRoot, 'audio')));
         
         // Gestion d'erreur artistique
         this.app.use((err, req, res, next) => {
@@ -799,6 +858,106 @@ class PoeticServer {
             console.error('Erreur récupération archive:', error);
             return [];
         }
+    }
+    
+    /* ===========================
+       RECHERCHE DANS LES TRANSCRIPTIONS
+       =========================== */
+    
+    async searchTranscriptions(query, maxResults = 50) {
+        return new Promise((resolve, reject) => {
+            const script = path.join(__dirname, 'search_transcriptions.py');
+            
+            const pythonArgs = [script, query, maxResults.toString()];
+            
+            const python = spawn(this.pythonPath, pythonArgs, {
+                cwd: this.projectRoot,
+                env: { 
+                    ...process.env, 
+                    PYTHONPATH: this.projectRoot,
+                    PYTHONIOENCODING: 'utf-8',
+                    LANG: 'en_US.UTF-8'
+                }
+            });
+            
+            let output = '';
+            let error = '';
+            
+            python.stdout.on('data', (data) => {
+                output += data.toString('utf8');
+            });
+            
+            python.stderr.on('data', (data) => {
+                error += data.toString('utf8');
+            });
+            
+            python.on('close', (code) => {
+                if (code !== 0) {
+                    console.error('❌ Erreur Python recherche:', error);
+                    reject(new Error('Erreur lors de la recherche'));
+                    return;
+                }
+                
+                try {
+                    // Parser le JSON de sortie
+                    const result = JSON.parse(output.trim());
+                    resolve(result);
+                } catch (e) {
+                    console.error('❌ Erreur parsing JSON recherche:', e, '\nOutput:', output);
+                    reject(new Error('Erreur de parsing de la réponse de recherche'));
+                }
+            });
+        });
+    }
+    
+    async extractAudioSegment(audioPath, startTime, endTime) {
+        return new Promise((resolve, reject) => {
+            const script = path.join(__dirname, 'extract_audio_segment.py');
+            
+            const pythonArgs = [
+                script,
+                audioPath,
+                startTime.toString(),
+                endTime.toString()
+            ];
+            
+            const python = spawn(this.pythonPath, pythonArgs, {
+                cwd: this.projectRoot,
+                env: { 
+                    ...process.env, 
+                    PYTHONPATH: this.projectRoot,
+                    PYTHONIOENCODING: 'utf-8',
+                    LANG: 'en_US.UTF-8'
+                }
+            });
+            
+            let output = '';
+            let error = '';
+            
+            python.stdout.on('data', (data) => {
+                output += data.toString('utf8');
+            });
+            
+            python.stderr.on('data', (data) => {
+                error += data.toString('utf8');
+            });
+            
+            python.on('close', (code) => {
+                if (code !== 0) {
+                    console.error('❌ Erreur Python extraction audio:', error);
+                    reject(new Error('Erreur lors de l\'extraction audio'));
+                    return;
+                }
+                
+                try {
+                    const result = JSON.parse(output.trim());
+                    resolve(result);
+                } catch (e) {
+                    console.error('❌ Erreur parsing JSON extraction:', e, '\nOutput:', output);
+                    reject(new Error('Erreur de parsing de la réponse d\'extraction'));
+                }
+            });
+        });
     }
     
     /* ===========================

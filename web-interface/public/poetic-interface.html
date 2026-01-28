@@ -67,6 +67,9 @@
             <button class="nav-btn" data-action="record" aria-label="Enregistrer">
                 <span>🎙️</span>
             </button>
+            <button class="nav-btn" data-action="search" aria-label="Recherche">
+                <span>⌖</span>
+            </button>
             <button class="nav-btn" data-action="archive" aria-label="Archive">
                 <span>≡</span>
             </button>
@@ -92,6 +95,32 @@
             </div>
         </aside>
         
+        <!-- Recherche (panneau coulissant) -->
+        <aside class="search-panel" id="search-panel">
+            <div class="search-drag-handle"></div>
+            <header class="search-header">
+                <h2>recherche</h2>
+                <button class="close-search" id="close-search" aria-label="Fermer">×</button>
+            </header>
+            <div class="search-content">
+                <div class="search-input-area">
+                    <input 
+                        type="text" 
+                        id="search-input" 
+                        placeholder="mots-clés ou phrase..."
+                        autocomplete="off"
+                    >
+                </div>
+                <div id="search-info" class="search-info" style="display: none;"></div>
+                <div id="search-loading" class="search-loading" style="display: none;">
+                    <div class="spinner"></div>
+                </div>
+                <div class="search-results" id="search-results">
+                    <!-- Résultats générés dynamiquement -->
+                </div>
+            </div>
+        </aside>
+        
     </main>
     
     <!-- Scripts -->
@@ -99,5 +128,6 @@
     <script src="recording-interface.js?v=20260126"></script>
     <script src="spider-minimal.js?v=2"></script>
     <script src="poetic-interface.js?v=20260124"></script>
+    <script src="search-module.js?v=20260128"></script>
 </body>
 </html>

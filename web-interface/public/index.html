@@ -75,6 +75,7 @@
         <nav class="state-nav" id="state-nav">
             <button class="nav-btn" data-action="restart">○</button>
             <button class="nav-btn" data-action="record" title="Enregistrer une contribution">◉</button>
+            <button class="nav-btn" data-action="search" title="Rechercher">⌖</button>
             <button class="nav-btn" data-action="archive">□</button>
         </nav>
         
@@ -95,11 +96,38 @@
             </div>
         </aside>
         
+        <!-- Recherche (panneau coulissant) -->
+        <aside class="search-panel" id="search-panel">
+            <div class="search-drag-handle"></div>
+            <header class="search-header">
+                <h2>recherche</h2>
+                <button class="close-search" id="close-search">×</button>
+            </header>
+            <div class="search-content">
+                <div class="search-input-area">
+                    <input 
+                        type="text" 
+                        id="search-input" 
+                        placeholder="mots-clés ou phrase..."
+                        autocomplete="off"
+                    >
+                </div>
+                <div id="search-info" class="search-info" style="display: none;"></div>
+                <div id="search-loading" class="search-loading" style="display: none;">
+                    <div class="spinner"></div>
+                </div>
+                <div class="search-results" id="search-results">
+                    <!-- Résultats générés dynamiquement -->
+                </div>
+            </div>
+        </aside>
+        
     </main>
     
     <!-- Scripts -->
     <script src="audio-recorder.js"></script>
     <script src="recording-interface.js"></script>
     <script src="poetic-interface.js"></script>
+    <script src="search-module.js"></script>
 </body>
 </html>

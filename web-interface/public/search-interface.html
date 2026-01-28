@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recherche dans les Transcriptions</title>
+    <link rel="stylesheet" href="search-interface.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 Recherche dans les transcriptions</h1>
+            <p class="subtitle">Recherchez des mots-clés ou phrases dans toutes les transcriptions audio</p>
+        </header>
+
+        <div class="search-box">
+            <input 
+                type="text" 
+                id="searchInput" 
+                placeholder="Entrez des mots-clés ou une phrase..."
+                autocomplete="off"
+            >
+            <button id="searchBtn">Rechercher</button>
+        </div>
+
+        <div id="searchInfo" class="search-info" style="display: none;"></div>
+
+        <div id="loading" class="loading" style="display: none;">
+            <div class="spinner"></div>
+            <p>Recherche en cours...</p>
+        </div>
+
+        <div id="results" class="results-container"></div>
+    </div>
+
+    <script src="search-interface.js"></script>
+</body>
+</html>
