@@ -148,8 +148,8 @@ class SearchModule {
             <div class="result-footer">
                 <div class="result-time">${startTime} → ${endTime} (${duration})</div>
                 <div class="result-player">
-                    <button class="result-play-btn" data-result-index="${index}">▶</button>
-                    <button class="result-download-btn" data-result-index="${index}" title="Télécharger cet extrait">⬇</button>
+                    <button class="result-play-btn" data-result-index="${index}"><span class="play-symbol">▶</span></button>
+                    <button class="result-download-btn" data-result-index="${index}" title="Télécharger cet extrait">↓</button>
                 </div>
             </div>
         `;
@@ -179,7 +179,7 @@ class SearchModule {
                 if (this.currentAudio && this.currentAudio !== audio) {
                     this.currentAudio.pause();
                     if (this.currentPlayBtn) {
-                        this.currentPlayBtn.textContent = '▶';
+                        this.currentPlayBtn.innerHTML = '<span class="play-symbol">▶</span>';
                         this.currentPlayBtn.classList.remove('playing');
                     }
                 }
@@ -187,14 +187,14 @@ class SearchModule {
                 // Démarrer la lecture
                 audio.currentTime = startTime;
                 audio.play();
-                playBtn.textContent = '⏸';
+                playBtn.innerHTML = '<span class="play-symbol">❙❙</span>';
                 playBtn.classList.add('playing');
                 
                 this.currentAudio = audio;
                 this.currentPlayBtn = playBtn;
             } else {
                 audio.pause();
-                playBtn.textContent = '▶';
+                playBtn.innerHTML = '<span class="play-symbol">▶</span>';
                 playBtn.classList.remove('playing');
             }
         });
@@ -204,7 +204,7 @@ class SearchModule {
             if (audio.currentTime >= endTime) {
                 audio.pause();
                 audio.currentTime = startTime;
-                playBtn.textContent = '▶';
+                playBtn.innerHTML = '<span class="play-symbol">▶</span>';
                 playBtn.classList.remove('playing');
             }
         });
@@ -212,7 +212,7 @@ class SearchModule {
         // Gestion des erreurs
         audio.addEventListener('error', () => {
             playBtn.disabled = true;
-            playBtn.textContent = '✕';
+            playBtn.innerHTML = '<span class="play-symbol">✕</span>';
             playBtn.style.opacity = '0.3';
         });
     }
@@ -282,7 +282,7 @@ class SearchModule {
                 btn.innerHTML = '✕';
                 btn.disabled = false;
                 setTimeout(() => {
-                    btn.innerHTML = '⬇';
+                    btn.innerHTML = '↓';
                     btn.disabled = false;
                 }, 2000);
             }

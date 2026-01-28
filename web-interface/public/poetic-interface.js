@@ -771,7 +771,7 @@ class PoeticInterface {
             const downloadBtn = document.createElement('button');
             downloadBtn.className = 'timeline-download-btn';
             downloadBtn.title = `Télécharger l'extrait ${index + 1}`;
-            downloadBtn.innerHTML = '⬇';
+            downloadBtn.innerHTML = '↓';
             downloadBtn.onclick = async (e) => {
                 e.stopPropagation();
                 await this.downloadPhraseAudio(phrase, index, downloadBtn);
@@ -925,7 +925,7 @@ class PoeticInterface {
             btn.innerHTML = '✗';
             btn.disabled = false;
             setTimeout(() => {
-                btn.innerHTML = '⬇';
+                btn.innerHTML = '↓';
             }, 2000);
         }
     }

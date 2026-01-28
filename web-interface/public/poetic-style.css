@@ -695,29 +695,33 @@ body {
 }
 
 .timeline-download-btn {
-    display: block;
     width: 20px;
     height: 20px;
+    border: none;
+    border-radius: 50%;
     background: var(--black);
     color: var(--white);
-    border-radius: 75%;
-    text-decoration: none;
     font-size: 10px;
-    line-height: 20px;
-    text-align: center;
     cursor: pointer;
-    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: var(--fast-transition);
     opacity: 0.7;
 }
 
 .timeline-download-btn:hover {
     opacity: 1;
-    transform: scale(1.15);
-    background: var(--black);
+    transform: scale(1.1);
 }
 
 .timeline-download-btn:active {
-    transform: scale(0.95);
+    transform: scale(0.9);
+}
+
+.timeline-download-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 .timeline-point {
@@ -1267,12 +1271,16 @@ body {
     border-radius: 50%;
     background: transparent;
     color: var(--black);
-    font-size: 10px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: var(--fast-transition);
+}
+
+.result-play-btn .play-symbol {
+    font-size: 10px;
+    color: inherit;
 }
 
 .result-play-btn:hover {
@@ -1289,24 +1297,30 @@ body {
     color: var(--white);
 }
 
+.result-play-btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+}
+
 .result-download-btn {
     width: 32px;
     height: 32px;
-    border: 1px solid var(--black);
+    border: none;
     border-radius: 50%;
-    background: transparent;
-    color: var(--black);
+    background: var(--black);
+    color: var(--white);
     font-size: 12px;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
     transition: var(--fast-transition);
+    opacity: 0.7;
 }
 
 .result-download-btn:hover {
-    background: var(--black);
-    color: var(--white);
+    opacity: 1;
+    transform: scale(1.1);
 }
 
 .result-download-btn:active {

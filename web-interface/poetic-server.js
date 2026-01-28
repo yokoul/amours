@@ -46,11 +46,6 @@ class PoeticServer {
             res.sendFile(path.join(__dirname, 'public', 'poetic-interface.html'));
         });
         
-        // Interface de recherche
-        this.app.get('/search', (req, res) => {
-            res.sendFile(path.join(__dirname, 'public', 'search-interface.html'));
-        });
-        
         // API pour récupération des mots
         this.app.get('/api/words', async (req, res) => {
             try {
