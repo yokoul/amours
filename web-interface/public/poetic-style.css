@@ -1213,6 +1213,9 @@ body {
     transition: max-height var(--medium-transition);
     border-bottom: 1px solid var(--grey-light);
     background: var(--grey-light);
+    position: sticky;
+    top: 72px; /* Hauteur approximative de search-input-area */
+    z-index: 9;
 }
 
 .search-filters.collapsed {
