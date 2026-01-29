@@ -194,6 +194,7 @@ class PoeticInterface {
         this.loadKaraokePreference();
         this.bindEvents();
         this.setupGestures();
+        this.setupButtonRepulsor();
         this.loadArchive();
         this.updateGenerateButton();
         console.log('🎭 Interface poétique initialisée');
@@ -404,6 +405,90 @@ class PoeticInterface {
                 this.closeArchive();
             }
         }, { passive: true });
+    }
+    
+    /* ===========================
+       RÉPULSEUR DE BOUTONS - Mécanique artistique
+       =========================== */
+    
+    setupButtonRepulsor() {
+        const generateBtn = document.getElementById('generate-btn');
+        const stateNav = document.getElementById('state-nav');
+        
+        if (!generateBtn || !stateNav) return;
+        
+        // État pour éviter les oscillations
+        let isRepelled = false;
+        
+        // Position initiale théorique des boutons (au centre bas)
+        const getInitialNavPosition = () => {
+            const windowHeight = window.innerHeight;
+            const margin = 32; // var(--space-m)
+            return {
+                bottom: margin,
+                top: windowHeight - margin - 40, // 40px hauteur approximative des boutons
+                centerX: window.innerWidth / 2
+            };
+        };
+        
+        // Observer les changements de position du bouton créer
+        const checkProximity = () => {
+            if (this.currentState !== 'inspiration') {
+                // Réinitialiser la position quand on n'est pas en état inspiration
+                stateNav.style.transform = 'translateX(-50%)';
+                stateNav.style.flexDirection = 'row';
+                stateNav.style.bottom = 'var(--space-m)';
+                stateNav.style.left = '50%';
+                stateNav.style.right = '';
+                isRepelled = false;
+                return;
+            }
+            
+            const btnRect = generateBtn.getBoundingClientRect();
+            const initialNavPos = getInitialNavPosition();
+            
+            // Calculer la distance par rapport à la position INITIALE des boutons
+            const verticalDistance = btnRect.bottom - initialNavPos.top;
+            
+            // Seuil de déclenchement
+            const threshold = 60;
+            
+            if (!isRepelled && verticalDistance > -threshold && verticalDistance < threshold) {
+                // Déplacer les boutons vers la gauche en colonne verticale
+                // Alignés avec les boutons de droite (thème/karaoké)
+                isRepelled = true;
+                stateNav.style.flexDirection = 'column';
+                stateNav.style.left = 'var(--space-m)';
+                stateNav.style.right = 'auto';
+                stateNav.style.bottom = 'var(--space-m)'; // Même hauteur que le bouton thème
+                stateNav.style.transform = 'none';
+            } else if (isRepelled && (verticalDistance < -threshold - 20 || verticalDistance > threshold + 20)) {
+                // Retour à la position centrale seulement si bien éloigné
+                isRepelled = false;
+                stateNav.style.flexDirection = 'row';
+                stateNav.style.left = '50%';
+                stateNav.style.right = 'auto';
+                stateNav.style.bottom = 'var(--space-m)';
+                stateNav.style.transform = 'translateX(-50%)';
+            }
+        };
+        
+        // Vérifier la proximité lors du scroll et du redimensionnement
+        const wordSpace = document.getElementById('word-space');
+        if (wordSpace) {
+            wordSpace.addEventListener('scroll', checkProximity);
+        }
+        
+        // Vérifier périodiquement quand on est en état inspiration
+        this.repulsorInterval = setInterval(() => {
+            if (this.currentState === 'inspiration') {
+                checkProximity();
+            }
+        }, 100);
+        
+        window.addEventListener('resize', checkProximity);
+        
+        console.log('🧲 Répulseur de boutons activé');
     }
     
     /* ===========================
