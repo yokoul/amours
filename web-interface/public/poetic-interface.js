@@ -263,11 +263,18 @@ class PoeticInterface {
         
         console.log(`🔄 Transition: ${oldState} → ${newState}`);
         
+        // Changer l'état immédiatement pour stopper les vérifications
+        this.currentState = newState;
+        
+        // Réinitialiser les boutons de navigation quand on quitte l'état inspiration
+        if (oldState === 'inspiration' && newState !== 'inspiration' && this.resetNavButtons) {
+            this.resetNavButtons();
+        }
+        
         // Transition douce avec timing artistique
         app.style.opacity = '0.9';
         
         setTimeout(() => {
-            this.currentState = newState;
             app.setAttribute('data-state', newState);
             
             // Actions spécifiques par état
@@ -420,6 +427,22 @@ class PoeticInterface {
         // État pour éviter les oscillations
         let isRepelled = false;
         
+        // Fonction pour réinitialiser la position des boutons
+        const resetNavPosition = () => {
+            if (isRepelled) {
+                console.log('🔄 Réinitialisation des boutons navigation');
+            }
+            stateNav.style.transform = 'translateX(-50%)';
+            stateNav.style.flexDirection = 'row';
+            stateNav.style.bottom = 'var(--space-m)';
+            stateNav.style.left = '50%';
+            stateNav.style.right = 'auto';
+            isRepelled = false;
+        };
+        
+        // Exposer la fonction de reset pour l'appeler depuis setState
+        this.resetNavButtons = resetNavPosition;
+        
         // Position initiale théorique des boutons (au centre bas)
         const getInitialNavPosition = () => {
             const windowHeight = window.innerHeight;
@@ -435,14 +458,12 @@ class PoeticInterface {
         const checkProximity = () => {
             if (this.currentState !== 'inspiration') {
                 // Réinitialiser la position quand on n'est pas en état inspiration
-                stateNav.style.transform = 'translateX(-50%)';
-                stateNav.style.flexDirection = 'row';
-                stateNav.style.bottom = 'var(--space-m)';
-                stateNav.style.left = '50%';
-                stateNav.style.right = '';
-                isRepelled = false;
+                resetNavPosition();
                 return;
             }
+            
+            // Vérifier que le bouton créer est visible
+            if (generateBtn.offsetParent === null) return;
             
             const btnRect = generateBtn.getBoundingClientRect();
             const initialNavPos = getInitialNavPosition();
@@ -453,23 +474,24 @@ class PoeticInterface {
             // Seuil de déclenchement
             const threshold = 60;
             
-            if (!isRepelled && verticalDistance > -threshold && verticalDistance < threshold) {
-                // Déplacer les boutons vers la gauche en colonne verticale
-                // Alignés avec les boutons de droite (thème/karaoké)
-                isRepelled = true;
-                stateNav.style.flexDirection = 'column';
-                stateNav.style.left = 'var(--space-m)';
-                stateNav.style.right = 'auto';
-                stateNav.style.bottom = 'var(--space-m)'; // Même hauteur que le bouton thème
-                stateNav.style.transform = 'none';
-            } else if (isRepelled && (verticalDistance < -threshold - 20 || verticalDistance > threshold + 20)) {
-                // Retour à la position centrale seulement si bien éloigné
-                isRepelled = false;
-                stateNav.style.flexDirection = 'row';
-                stateNav.style.left = '50%';
-                stateNav.style.right = 'auto';
-                stateNav.style.bottom = 'var(--space-m)';
-                stateNav.style.transform = 'translateX(-50%)';
+            // Si dans la zone de proximité : déplacer à gauche
+            if (verticalDistance > -threshold && verticalDistance < threshold) {
+                if (!isRepelled) {
+                    console.log('⬅️ Répulsion activée - distance:', verticalDistance.toFixed(0));
+                    // Déplacer les boutons vers la gauche en colonne verticale
+                    isRepelled = true;
+                    stateNav.style.flexDirection = 'column';
+                    stateNav.style.left = 'var(--space-m)';
+                    stateNav.style.right = 'auto';
+                    stateNav.style.bottom = 'var(--space-m)';
+                    stateNav.style.transform = 'none';
+                }
+            } else {
+                if (isRepelled) {
+                    console.log('➡️ Retour au centre - distance:', verticalDistance.toFixed(0));
+                    // Retour à la position centrale dès qu'on sort de la zone
+                    resetNavPosition();
+                }
             }
         };
         
