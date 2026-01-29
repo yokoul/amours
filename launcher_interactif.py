@@ -385,6 +385,14 @@ class InteractiveLauncher:
             return
         
         print(f"\n📊 {len(audio_files)} fichiers audio trouvés")
+        
+        # Afficher la liste complète des fichiers
+        print("\n📋 LISTE DES FICHIERS (ordre alphabétique):")
+        print("-" * 60)
+        for i, audio_file in enumerate(audio_files, 1):
+            rel_path = audio_file.relative_to(self.project_root)
+            print(f"{i:3d}. {rel_path}")
+        
         print("\n⚙️  CONFIGURATION DU BATCH:")
         print("   • Modèle Whisper: LARGE (haute qualité)")
         print("   • Reconstruction de phrases: OUI")
@@ -392,8 +400,22 @@ class InteractiveLauncher:
         print("   • Écrasement des JSON existants: OUI")
         print()
         
+        # Demander le point de départ
+        start_from = input(f"\n🔢 Commencer à partir du fichier n° (1-{len(audio_files)}, défaut: 1): ").strip()
+        try:
+            start_index = int(start_from) - 1 if start_from else 0
+            start_index = max(0, min(start_index, len(audio_files) - 1))
+        except ValueError:
+            start_index = 0
+        
+        if start_index > 0:
+            print(f"▶️  Reprise à partir du fichier n°{start_index + 1}: {audio_files[start_index].name}")
+            files_to_process = audio_files[start_index:]
+        else:
+            files_to_process = audio_files
+        
         # Demander confirmation
-        confirm = input(f"⚠️  Voulez-vous traiter ces {len(audio_files)} fichiers ? (O/n): ").strip().lower()
+        confirm = input(f"\n⚠️  Voulez-vous traiter {len(files_to_process)} fichiers (n°{start_index + 1} à {len(audio_files)}) ? (O/n): ").strip().lower()
         if confirm in ['n', 'non', 'no']:
             print("❌ Traitement batch annulé.")
             return
@@ -406,9 +428,10 @@ class InteractiveLauncher:
         success_count = 0
         fail_count = 0
         
-        for i, audio_file in enumerate(audio_files, 1):
+        for idx, audio_file in enumerate(files_to_process, start_index + 1):
             print("\n" + "=" * 60)
-            print(f"🎵 Traitement {i}/{len(audio_files)}: {audio_file.name}")
+            print(f"🎵 Traitement {idx}/{len(audio_files)}: {audio_file.name}")
+            print(f"   (Fichier n°{idx} sur {len(audio_files)} au total)")
             print("=" * 60)
             
             # Étape 1: Transcription avec reconstruction et analyse intégrée
@@ -458,6 +481,15 @@ class InteractiveLauncher:
             print(f"❌ Fichiers en erreur: {fail_count}")
         print(f"📂 Transcriptions dans: {output_dir}")
         print(f"📂 Analyses sémantiques dans: {output_semantic}")
+        
+        # Indiquer le prochain fichier en cas d'interruption
+        if start_index + len(files_to_process) < len(audio_files):
+            next_file_num = start_index + len(files_to_process) + 1
+            print(f"\n💡 Pour continuer plus tard, relancer avec le fichier n°{next_file_num}")
+        elif success_count + fail_count < len(files_to_process):
+            next_file_num = start_index + success_count + fail_count + 1
+            print(f"\n💡 En cas d'interruption, reprendre au fichier n°{next_file_num}")
+        
         print("\n🎉 Traitement batch terminé!")
     
     def list_files(self):
