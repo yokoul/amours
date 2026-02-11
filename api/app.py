@@ -3,13 +3,18 @@ Amours API — FastAPI application.
 
 Persistent Python process that loads ML models once at startup and
 exposes the full Amours pipeline via REST endpoints.
+
+All route names and response formats match the existing Express
+(poetic-server.js) contract so the vanilla JS frontend works unchanged.
 """
 
 import json
 import logging
 import os
+import shutil
 import sys
 import tempfile
+import time
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -17,9 +22,18 @@ from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from fastapi import FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import (
+    BackgroundTasks,
+    FastAPI,
+    File,
+    Form,
+    HTTPException,
+    Query,
+    UploadFile,
+)
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 
 # Ensure project root is on sys.path so `from src.xxx import` works
 PROJECT_ROOT = Path(__file__).parent.parent
@@ -49,6 +63,10 @@ logging.basicConfig(
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
 )
 logger = logging.getLogger("amours.api")
+
+# ── In-memory job store (contribution uploads) ────────────────
+
+_jobs: Dict[str, Dict] = {}
 
 
 # ── Lifecycle ──────────────────────────────────────────────────
@@ -145,14 +163,11 @@ async def transcribe(
         finally:
             tmp.close()
     elif opts.file_url:
-        # Remote URL — let PyAV/ffmpeg handle it directly if possible,
-        # otherwise download to temp file
         audio_path = opts.file_url
     else:
         raise HTTPException(400, "Provide either a file upload or file_url")
 
     try:
-        # Choose transcription method based on available transcriber
         transcriber = models.transcriber
         has_speakers = hasattr(transcriber, "transcribe_with_speakers")
 
@@ -184,10 +199,7 @@ async def transcribe(
             love_data = enriched.get("love_analysis")
             result["love_analysis"] = love_data
 
-        # Save transcription to output directory
         _save_transcription(result, audio_path)
-
-        # Reload mix player index so new words are available
         models.reload_mix_player_index()
 
         metadata = result.get("metadata", {})
@@ -212,7 +224,6 @@ async def transcribe(
         return TranscribeResponse(success=False, error=str(e))
 
     finally:
-        # Clean up uploaded temp file
         if file is not None and os.path.exists(audio_path):
             os.unlink(audio_path)
 
@@ -234,17 +245,11 @@ def _save_transcription(result: Dict, audio_path: str):
 
 @app.post("/api/analyze", response_model=AnalyzeResponse)
 async def analyze_love(request: AnalyzeRequest):
-    """
-    Run semantic love type analysis on existing transcription data.
-
-    Provide either a transcription_file name (looked up in output_transcription/)
-    or inline transcription_data.
-    """
+    """Run semantic love type analysis on existing transcription data."""
     if models.love_analyzer is None:
         raise HTTPException(503, "Love analyzer model not loaded")
 
     try:
-        # Load transcription data
         if request.transcription_data:
             data = request.transcription_data
         elif request.transcription_file:
@@ -252,7 +257,9 @@ async def analyze_love(request: AnalyzeRequest):
             if not file_path.suffix:
                 file_path = file_path.with_suffix(".json")
             if not file_path.exists():
-                raise HTTPException(404, f"Transcription file not found: {file_path.name}")
+                raise HTTPException(
+                    404, f"Transcription file not found: {file_path.name}"
+                )
             with open(file_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
         else:
@@ -260,11 +267,9 @@ async def analyze_love(request: AnalyzeRequest):
                 400, "Provide either transcription_file or transcription_data"
             )
 
-        # Run analysis
         enriched = models.love_analyzer.analyze_transcription(data)
         love = enriched.get("love_analysis", {})
 
-        # Save enriched output
         if request.transcription_file:
             stem = Path(request.transcription_file).stem
             out_path = config.SEMANTIC_DIR / f"{stem}_love_analysis.json"
@@ -288,15 +293,16 @@ async def analyze_love(request: AnalyzeRequest):
 
 
 # ── Mix-Play Generation ────────────────────────────────────────
+# Route: /api/generate (matches frontend fetch calls in poetic-interface.js)
 
 
-@app.post("/api/generate-mix", response_model=GenerateMixResponse)
-async def generate_mix(request: GenerateMixRequest):
+@app.post("/api/generate")
+async def generate(request: GenerateMixRequest):
     """
     Generate audio phrases using the Mix-Play system.
 
-    Searches the word index for matching keywords and composes
-    audio montages from different speakers and source files.
+    Route name matches the existing Express endpoint that the
+    poetic-interface.js frontend calls.
     """
     if models.mix_player is None:
         raise HTTPException(503, "MixPlayer not loaded (no transcriptions available?)")
@@ -313,7 +319,6 @@ async def generate_mix(request: GenerateMixRequest):
             if composed is None:
                 continue
 
-            # Generate audio
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             keywords_str = "_".join(request.words[:3])
             output_name = f"web_montage_{keywords_str}_{i}_{timestamp}.mp3"
@@ -324,65 +329,126 @@ async def generate_mix(request: GenerateMixRequest):
                 output_path=output_path,
             )
 
-            # Love analysis on composed text if available
             love_scores = None
             if models.love_analyzer:
                 love_scores = models.love_analyzer.analyze_segment(composed.text)
 
-            phrases.append(
-                PhraseData(
-                    index=i,
-                    text=composed.text,
-                    speaker=composed.speakers_used[0] if composed.speakers_used else None,
-                    file_name=composed.files_used[0] if composed.files_used else None,
-                    start_time=composed.words[0].start if composed.words else 0,
-                    end_time=composed.words[-1].end if composed.words else 0,
-                    duration=composed.total_duration,
-                    keywords_found=request.words,
-                    love_type=max(love_scores, key=love_scores.get) if love_scores else None,
-                    love_analysis=love_scores,
-                )
-            )
+            phrase_data = {
+                "index": i,
+                "text": composed.text,
+                "speaker": (
+                    composed.speakers_used[0] if composed.speakers_used else None
+                ),
+                "file_name": composed.files_used[0] if composed.files_used else None,
+                "audio_path": (
+                    composed.words[0].audio_path if composed.words else None
+                ),
+                "keywords_found": request.words,
+                "match_score": 1.0,
+                "start_time": composed.words[0].start if composed.words else 0,
+                "end_time": composed.words[-1].end if composed.words else 0,
+                "duration": composed.total_duration,
+                "words": [
+                    {"word": w.word, "start": w.start, "end": w.end}
+                    for w in composed.words
+                ],
+                "love_type": (
+                    max(love_scores, key=love_scores.get) if love_scores else None
+                ),
+                "love_analysis": love_scores,
+            }
+            phrases.append(phrase_data)
             audio_files.append(output_path)
 
         if not phrases:
-            return GenerateMixResponse(
-                success=False,
-                error=f"No phrases found for keywords: {request.words}",
+            return JSONResponse(
+                {"success": False, "error": f"Aucune phrase trouvee pour: {request.words}"}
             )
 
-        # Combine all audio files into one montage
-        total_duration = sum(p.duration for p in phrases)
+        total_duration = sum(p["duration"] for p in phrases)
         audio_url = f"/audio/{Path(audio_files[0]).name}" if audio_files else None
 
         # Aggregate semantic scores
         agg_scores = {}
         for p in phrases:
-            if p.love_analysis:
-                for k, v in p.love_analysis.items():
+            if p.get("love_analysis"):
+                for k, v in p["love_analysis"].items():
                     agg_scores[k] = agg_scores.get(k, 0) + v
         if agg_scores:
             n = len(phrases)
             agg_scores = {k: round(v / n, 4) for k, v in agg_scores.items()}
 
-        return GenerateMixResponse(
-            success=True,
-            phrases=phrases,
-            audio_url=audio_url,
-            duration_seconds=round(total_duration, 2),
-            keywords=request.words,
-            semantic_analysis=agg_scores or None,
+        return JSONResponse(
+            {
+                "success": True,
+                "phrases": phrases,
+                "audio_url": audio_url,
+                "audioFile": audio_url,
+                "duration_seconds": round(total_duration, 2),
+                "keywords": request.words,
+                "timestamp": int(time.time() * 1000),
+                "semantic_analysis": agg_scores or None,
+            }
         )
 
     except Exception as e:
         logger.exception("Mix-Play generation failed")
-        return GenerateMixResponse(success=False, error=str(e))
+        return JSONResponse({"success": False, "error": str(e)})
+
+
+# ── Generate single phrase audio ───────────────────────────────
+# Route: /api/generate-phrase-audio/{phraseIndex}
+# (poetic-interface.js calls this when user clicks download on a phrase)
+
+
+@app.post("/api/generate-phrase-audio/{phrase_index}")
+async def generate_phrase_audio(phrase_index: int, request: dict):
+    """Generate audio for a single phrase on demand."""
+    try:
+        from pydub import AudioSegment
+
+        phrase = request.get("phrase", {})
+        audio_path = phrase.get("audio_path", "")
+        start_time = phrase.get("start_time", 0)
+        end_time = phrase.get("extended_end_time") or phrase.get("end_time", 0)
+
+        if not audio_path or not Path(audio_path).exists():
+            return JSONResponse({"success": False, "error": f"Fichier introuvable: {audio_path}"})
+
+        audio = AudioSegment.from_file(audio_path)
+        start_ms = max(0, int(start_time * 1000) - 100)
+        end_ms = int(end_time * 1000) + 100
+        segment = audio[start_ms:end_ms]
+
+        segment = segment.fade_in(50).fade_out(50)
+
+        keywords = phrase.get("keywords_found", ["extrait"])
+        keyword_str = keywords[0].split("≈")[0] if keywords else "extrait"
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_name = f"extrait_{keyword_str}_{phrase_index}_{timestamp}.mp3"
+        output_path = config.GENERATED_AUDIO_DIR / output_name
+
+        segment.export(str(output_path), format="mp3", bitrate="192k")
+
+        return JSONResponse(
+            {
+                "success": True,
+                "audio_file": output_name,
+                "duration": round(len(segment) / 1000.0, 2),
+                "phrase_index": phrase_index,
+            }
+        )
+
+    except Exception as e:
+        logger.exception("Phrase audio generation failed")
+        return JSONResponse({"success": False, "error": str(e)})
 
 
 # ── Search ─────────────────────────────────────────────────────
+# Route: /api/search (matches search-module.js)
 
 
-@app.get("/api/search", response_model=SearchResponse)
+@app.get("/api/search")
 async def search_transcriptions(
     q: str = Query(..., min_length=2, description="Search query"),
     limit: int = Query(10, ge=1, le=100),
@@ -390,11 +456,7 @@ async def search_transcriptions(
     sources: Optional[str] = Query(None, description="Comma-separated source files"),
     context_duration: float = Query(60.0, description="Max context duration in seconds"),
 ):
-    """
-    Full-text search across all transcription files.
-
-    Returns matching segments with context and pagination.
-    """
+    """Full-text search across all transcription files."""
     try:
         results = []
         source_filter = set()
@@ -403,7 +465,6 @@ async def search_transcriptions(
 
         query_lower = q.lower()
 
-        # Search through transcription JSON files
         for json_file in sorted(config.TRANSCRIPTION_DIR.glob("*_complete.json")):
             try:
                 with open(json_file, "r", encoding="utf-8") as f:
@@ -413,18 +474,17 @@ async def search_transcriptions(
 
             metadata = data.get("metadata", {})
             source_file = metadata.get("file", json_file.stem)
+            source_path = metadata.get("path", "")
 
             if source_filter and source_file not in source_filter:
                 continue
 
             segments = data.get("transcription", {}).get("segments", [])
-            source_path = metadata.get("path", "")
 
             for seg in segments:
                 seg_text = seg.get("text", "")
                 seg_lower = seg_text.lower()
 
-                # Exact substring match or fuzzy match
                 if query_lower in seg_lower:
                     score = 1.0
                 else:
@@ -433,124 +493,74 @@ async def search_transcriptions(
                         continue
                     score = ratio
 
-                # Build context from neighboring segments
                 seg_id = seg.get("id", 0)
+                seg_start = seg.get("start", 0)
+
+                # Build context segments (neighboring within context_duration)
+                context_segments = []
                 context_parts = []
                 for ctx_seg in segments:
                     ctx_start = ctx_seg.get("start", 0)
-                    seg_start = seg.get("start", 0)
                     if abs(ctx_start - seg_start) <= context_duration:
                         context_parts.append(ctx_seg.get("text", ""))
+                        context_segments.append(
+                            {
+                                "id": ctx_seg.get("id", 0),
+                                "text": ctx_seg.get("text", ""),
+                                "start": ctx_seg.get("start", 0),
+                                "end": ctx_seg.get("end", 0),
+                                "speaker": ctx_seg.get("speaker"),
+                                "words": ctx_seg.get("words"),
+                            }
+                        )
 
                 results.append(
-                    SearchResult(
-                        source_file=source_file,
-                        segment_id=seg_id,
-                        speaker=seg.get("speaker"),
-                        start_time=seg.get("start", 0),
-                        end_time=seg.get("end", 0),
-                        duration=seg.get("duration", seg.get("end", 0) - seg.get("start", 0)),
-                        matched_text=seg_text,
-                        context_text=" ".join(context_parts) if context_parts else None,
-                        relevance_score=round(score, 3),
-                    )
+                    {
+                        "source_file": source_file,
+                        "source_path": source_path,
+                        "transcription_file": json_file.stem,
+                        "segment_id": seg_id,
+                        "speaker": seg.get("speaker"),
+                        "start_time": seg.get("start", 0),
+                        "end_time": seg.get("end", 0),
+                        "duration": seg.get(
+                            "duration", seg.get("end", 0) - seg.get("start", 0)
+                        ),
+                        "matched_text": seg_text,
+                        "context_text": " ".join(context_parts),
+                        "context_segments": context_segments,
+                        "relevance_score": round(score, 3),
+                    }
                 )
 
-        # Sort by relevance
-        results.sort(key=lambda r: r.relevance_score, reverse=True)
+        results.sort(key=lambda r: r["relevance_score"], reverse=True)
         total = len(results)
         paginated = results[offset : offset + limit]
 
-        return SearchResponse(
-            success=True,
-            query=q,
-            total_results=total,
-            returned_results=len(paginated),
-            offset=offset,
-            limit=limit,
-            results=paginated,
+        return JSONResponse(
+            {
+                "success": True,
+                "query": q,
+                "total_results": total,
+                "returned_results": len(paginated),
+                "offset": offset,
+                "limit": limit,
+                "results": paginated,
+            }
         )
 
     except Exception as e:
         logger.exception("Search failed")
-        return SearchResponse(success=False, error=str(e))
+        return JSONResponse({"success": False, "error": str(e)})
 
 
-# ── Audio Extraction ───────────────────────────────────────────
+# ── Search sources ─────────────────────────────────────────────
+# Route: /api/search-sources (matches search-module.js)
 
 
-@app.post("/api/extract-audio", response_model=ExtractAudioResponse)
-async def extract_audio(request: ExtractAudioRequest):
-    """Extract a time segment from an audio file and return it as MP3."""
-    try:
-        from pydub import AudioSegment
-
-        audio_path = Path(request.audio_path)
-        if not audio_path.exists():
-            raise HTTPException(404, f"Audio file not found: {audio_path.name}")
-
-        audio = AudioSegment.from_file(str(audio_path))
-        start_ms = int(request.start_time * 1000)
-        end_ms = int(request.end_time * 1000)
-        segment = audio[start_ms:end_ms]
-
-        # Apply fade in/out
-        segment = segment.fade_in(100).fade_out(100)
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_name = f"extract_{audio_path.stem}_{timestamp}.mp3"
-        output_path = config.GENERATED_AUDIO_DIR / output_name
-
-        segment.export(str(output_path), format="mp3", bitrate="192k")
-
-        return ExtractAudioResponse(
-            success=True,
-            audio_url=f"/audio/{output_name}",
-            duration=round(len(segment) / 1000.0, 2),
-        )
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception("Audio extraction failed")
-        return ExtractAudioResponse(success=False, error=str(e))
-
-
-# ── Static audio serving ──────────────────────────────────────
-
-
-@app.get("/audio/{filename}")
-async def serve_audio(filename: str):
-    """Serve generated audio files."""
-    # Check multiple directories
-    for directory in [config.GENERATED_AUDIO_DIR, config.MIX_PLAY_DIR]:
-        file_path = directory / filename
-        if file_path.exists():
-            return FileResponse(
-                str(file_path),
-                media_type="audio/mpeg",
-                headers={"Accept-Ranges": "bytes"},
-            )
-
-    raise HTTPException(404, f"Audio file not found: {filename}")
-
-
-# ── Utility endpoints ─────────────────────────────────────────
-
-
-@app.post("/api/reload-index")
-async def reload_index():
-    """Reload Mix-Play word index after transcription files change."""
-    models.reload_mix_player_index()
-    word_count = 0
-    if models.mix_player and hasattr(models.mix_player, "word_index"):
-        word_count = len(models.mix_player.word_index)
-    return {"success": True, "words_indexed": word_count}
-
-
-@app.get("/api/sources")
-async def list_sources():
-    """List available transcription source files."""
+@app.get("/api/search-sources")
+async def search_sources():
+    """List available transcription source files for search filtering."""
     sources = []
     for json_file in sorted(config.TRANSCRIPTION_DIR.glob("*_complete.json")):
         try:
@@ -568,17 +578,321 @@ async def list_sources():
         except (json.JSONDecodeError, OSError):
             continue
 
-    return {"success": True, "sources": sources, "count": len(sources)}
+    return JSONResponse({"success": True, "sources": sources, "count": len(sources)})
+
+
+# ── Audio Extraction ───────────────────────────────────────────
+# Route: /api/extract-search-audio (matches search-module.js)
+
+
+@app.post("/api/extract-search-audio")
+async def extract_search_audio(request: ExtractAudioRequest):
+    """Extract a time segment from an audio file and return it as MP3."""
+    try:
+        from pydub import AudioSegment
+
+        audio_path = Path(request.audio_path)
+        if not audio_path.exists():
+            return JSONResponse(
+                {"success": False, "error": f"Fichier introuvable: {audio_path.name}"}
+            )
+
+        audio = AudioSegment.from_file(str(audio_path))
+        start_ms = int(request.start_time * 1000)
+        end_ms = int(request.end_time * 1000)
+        segment = audio[start_ms:end_ms]
+
+        segment = segment.fade_in(100).fade_out(100)
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        output_name = f"search_{audio_path.stem}_{timestamp}.mp3"
+        output_path = config.GENERATED_AUDIO_DIR / output_name
+
+        segment.export(str(output_path), format="mp3", bitrate="192k")
+
+        # Frontend expects "audio_file" (not "audio_url")
+        return JSONResponse(
+            {
+                "success": True,
+                "audio_file": output_name,
+                "duration": round(len(segment) / 1000.0, 2),
+                "size_bytes": output_path.stat().st_size,
+            }
+        )
+
+    except Exception as e:
+        logger.exception("Audio extraction failed")
+        return JSONResponse({"success": False, "error": str(e)})
+
+
+# ── Upload contribution ───────────────────────────────────────
+# Route: /api/upload-contribution (matches audio-recorder.js)
+
+
+@app.post("/api/upload-contribution")
+async def upload_contribution(
+    background_tasks: BackgroundTasks,
+    audio: UploadFile = File(...),
+    metadata: str = Form("{}"),
+):
+    """
+    Upload user-recorded audio for transcription and analysis.
+
+    Returns a jobId immediately; processing runs in the background.
+    Poll /api/processing-status/{jobId} for progress.
+    """
+    job_id = str(uuid.uuid4())[:8]
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    # Parse metadata
+    try:
+        meta = json.loads(metadata)
+    except json.JSONDecodeError:
+        meta = {}
+
+    # Save uploaded audio
+    suffix = Path(audio.filename or "recording.webm").suffix or ".webm"
+    audio_filename = f"contribution_{timestamp}_{job_id}{suffix}"
+    contributions_dir = config.AUDIO_DIR / "contributions"
+    contributions_dir.mkdir(parents=True, exist_ok=True)
+    audio_path = contributions_dir / audio_filename
+
+    content = await audio.read()
+    with open(audio_path, "wb") as f:
+        f.write(content)
+
+    # Initialize job state
+    _jobs[job_id] = {
+        "jobId": job_id,
+        "status": "processing",
+        "progress": {"step": "upload", "message": "Fichier recu, demarrage..."},
+        "audioFile": audio_filename,
+        "startTime": time.time(),
+    }
+
+    # Process in background
+    background_tasks.add_task(_process_contribution, job_id, str(audio_path), meta)
+
+    return JSONResponse(
+        {
+            "success": True,
+            "jobId": job_id,
+            "message": "Contribution recue, traitement en cours...",
+            "audioFile": audio_filename,
+        }
+    )
+
+
+def _process_contribution(job_id: str, audio_path: str, meta: dict):
+    """Background task: transcribe and analyze an uploaded contribution."""
+    job = _jobs[job_id]
+
+    try:
+        # Step 1: Transcription
+        job["progress"] = {"step": "transcription", "message": "Transcription en cours..."}
+
+        if models.transcriber is None:
+            raise RuntimeError("Transcriber not loaded")
+
+        has_speakers = hasattr(models.transcriber, "transcribe_with_speakers")
+        if has_speakers:
+            result = models.transcriber.transcribe_with_speakers(
+                audio_path, word_timestamps=True
+            )
+        else:
+            result = models.transcriber.transcribe_with_timestamps(
+                audio_path, word_timestamps=True
+            )
+
+        # Sentence reconstruction
+        if models.sentence_reconstructor:
+            segments = result.get("transcription", {}).get("segments", [])
+            if segments:
+                reconstructed = models.sentence_reconstructor.reconstruct_sentences(
+                    segments
+                )
+                result["transcription"]["segments"] = reconstructed
+
+        # Save transcription
+        _save_transcription(result, audio_path)
+
+        transcription = result.get("transcription", {})
+        job["transcriptionText"] = transcription.get("text", "")
+        job["words"] = []
+        for seg in transcription.get("segments", []):
+            for w in seg.get("words", []):
+                job["words"].append(w)
+        job["transcriptionFile"] = f"{Path(audio_path).stem}_complete.json"
+
+        # Step 2: Semantic analysis
+        job["progress"] = {
+            "step": "semantic",
+            "message": "Analyse semantique en cours...",
+        }
+
+        if models.love_analyzer:
+            enriched = models.love_analyzer.analyze_transcription(result)
+            love = enriched.get("love_analysis", {})
+            stem = Path(audio_path).stem
+            out_path = config.SEMANTIC_DIR / f"{stem}_love_analysis.json"
+            with open(out_path, "w", encoding="utf-8") as f:
+                json.dump(enriched, f, ensure_ascii=False, indent=2)
+            job["semanticFile"] = out_path.name
+            job["semanticAnalysis"] = love
+
+        # Done
+        models.reload_mix_player_index()
+        job["status"] = "completed"
+        job["progress"] = {"step": "done", "message": "Traitement termine"}
+        job["processingDuration"] = round(time.time() - job["startTime"], 1)
+
+    except Exception as e:
+        logger.exception("Contribution processing failed for job %s", job_id)
+        job["status"] = "error"
+        job["error"] = str(e)
+        job["progress"] = {"step": "error", "message": str(e)}
+
+
+# ── Processing status ─────────────────────────────────────────
+# Route: /api/processing-status/{jobId} (matches recording-interface.js)
+
+
+@app.get("/api/processing-status/{job_id}")
+async def processing_status(job_id: str):
+    """Check the processing status of an uploaded contribution."""
+    job = _jobs.get(job_id)
+    if job is None:
+        return JSONResponse(
+            {"jobId": job_id, "status": "unknown", "error": "Job non trouve"},
+            status_code=404,
+        )
+    return JSONResponse(job)
+
+
+# ── Words ──────────────────────────────────────────────────────
+# Route: /api/words (matches poetic-interface.js)
+# The frontend expects a plain JSON array of strings.
 
 
 @app.get("/api/words")
-async def get_words(count: int = Query(10, ge=1, le=100)):
-    """Get random words from the Mix-Play word index."""
-    if models.mix_player is None or not hasattr(models.mix_player, "word_index"):
-        return {"success": True, "words": [], "count": 0}
+async def get_words():
+    """Return a list of inspirational French words about love."""
+    words = [
+        "amour", "tendresse", "passion", "desir",
+        "coeur", "caresse", "emotion", "reve",
+        "douceur", "bonheur", "partage", "confiance",
+        "espoir", "lumiere", "intimite", "eternite",
+    ]
+    return JSONResponse(words)
 
+
+# ── Random words from index ───────────────────────────────────
+# Route: /api/random-words/{count} (matches app.js spectacle interface)
+
+
+@app.get("/api/random-words/{count}")
+async def get_random_words(count: int):
+    """Get N random words from the Mix-Play word index."""
     import random
+
+    if models.mix_player is None or not hasattr(models.mix_player, "word_index"):
+        return JSONResponse([])
 
     all_words = list(models.mix_player.word_index.keys())
     sample = random.sample(all_words, min(count, len(all_words)))
-    return {"success": True, "words": sample, "count": len(sample)}
+    return JSONResponse(sample)
+
+
+# ── Archive ────────────────────────────────────────────────────
+# Route: /api/archive (matches poetic-server.js archive endpoint)
+
+
+@app.get("/api/archive")
+async def get_archive():
+    """Return recent generated audio creations."""
+    creations = []
+
+    for audio_file in sorted(
+        config.GENERATED_AUDIO_DIR.glob("web_montage_*.mp3"), reverse=True
+    ):
+        if len(creations) >= 20:
+            break
+        stat = audio_file.stat()
+        creations.append(
+            {
+                "filename": audio_file.name,
+                "audio_url": f"/audio/{audio_file.name}",
+                "created": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+                "size_bytes": stat.st_size,
+            }
+        )
+
+    return JSONResponse({"success": True, "creations": creations, "count": len(creations)})
+
+
+# ── Reload index ───────────────────────────────────────────────
+
+
+@app.post("/api/reload-index")
+async def reload_index():
+    """Reload Mix-Play word index after transcription files change."""
+    models.reload_mix_player_index()
+    word_count = 0
+    if models.mix_player and hasattr(models.mix_player, "word_index"):
+        word_count = len(models.mix_player.word_index)
+    return JSONResponse({"success": True, "words_indexed": word_count})
+
+
+# ── Audio serving ──────────────────────────────────────────────
+# Serves from generated audio dir AND output_mix_play/ (like Express did)
+
+
+@app.get("/audio/{filename:path}")
+async def serve_audio(filename: str):
+    """Serve generated audio files."""
+    for directory in [config.GENERATED_AUDIO_DIR, config.MIX_PLAY_DIR]:
+        file_path = directory / filename
+        if file_path.exists() and file_path.is_file():
+            return FileResponse(
+                str(file_path),
+                media_type="audio/mpeg",
+                headers={"Accept-Ranges": "bytes"},
+            )
+
+    raise HTTPException(404, f"Audio file not found: {filename}")
+
+
+# ── Audio source files ─────────────────────────────────────────
+# Serves original audio sources (like Express: /audio-sources → audio/)
+
+
+@app.get("/audio-sources/{filename:path}")
+async def serve_audio_source(filename: str):
+    """Serve original audio source files."""
+    file_path = config.AUDIO_DIR / filename
+    if file_path.exists() and file_path.is_file():
+        suffix = file_path.suffix.lower()
+        media_types = {
+            ".mp3": "audio/mpeg",
+            ".wav": "audio/wav",
+            ".m4a": "audio/mp4",
+            ".ogg": "audio/ogg",
+            ".flac": "audio/flac",
+            ".webm": "audio/webm",
+        }
+        return FileResponse(
+            str(file_path),
+            media_type=media_types.get(suffix, "application/octet-stream"),
+            headers={"Accept-Ranges": "bytes"},
+        )
+
+    raise HTTPException(404, f"Audio source not found: {filename}")
+
+
+# ── Static frontend (mounted last so API routes take priority) ─
+# Serves web-interface/public/ at root, including poetic-interface.html
+
+
+STATIC_DIR = PROJECT_ROOT / "web-interface" / "public"
+if STATIC_DIR.exists():
+    app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
