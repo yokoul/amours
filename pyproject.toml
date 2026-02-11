@@ -1,7 +1,7 @@
 [project]
-name = "audio-transcription-timecodes"
-version = "1.4.0"
-description = "Extraction de mots et phrases avec timecodes de fichiers audio français"
+name = "scribes"
+version = "2.0.0"
+description = "Audio/video transcription, subtitling, and semantic analysis platform"
 authors = [{name = "Yan", email = "yan@example.com"}]
 readme = "README.md"
 requires-python = ">=3.9"

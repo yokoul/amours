@@ -22,8 +22,8 @@ class TranscribeRequest(BaseModel):
     reconstruct_sentences: bool = Field(
         True, description="Enable sentence reconstruction"
     )
-    with_love_analysis: bool = Field(
-        False, description="Run love type analysis after transcription"
+    with_semantic_analysis: bool = Field(
+        False, description="Run semantic analysis after transcription"
     )
 
 
@@ -44,8 +44,8 @@ class SegmentData(BaseModel):
     text: str
     speaker: Optional[str] = None
     words: Optional[List[WordData]] = None
-    love_analysis: Optional[Dict[str, float]] = None
-    dominant_love_type: Optional[str] = None
+    semantic_analysis: Optional[Dict[str, float]] = None
+    dominant_category: Optional[str] = None
 
 
 class TranscriptionMetadata(BaseModel):
@@ -61,15 +61,15 @@ class TranscribeResponse(BaseModel):
     metadata: Optional[TranscriptionMetadata] = None
     text: Optional[str] = None
     segments: Optional[List[SegmentData]] = None
-    love_analysis: Optional[Dict] = None
+    semantic_analysis: Optional[Dict] = None
     error: Optional[str] = None
 
 
-# ── Love Analysis ──────────────────────────────────────────────
+# ── Semantic Analysis ─────────────────────────────────────────
 
 
 class AnalyzeRequest(BaseModel):
-    """Request body for semantic love analysis."""
+    """Request body for semantic analysis."""
 
     transcription_file: Optional[str] = Field(
         None,
@@ -81,7 +81,7 @@ class AnalyzeRequest(BaseModel):
     threshold: float = Field(0.1, description="Minimum score threshold")
 
 
-class LoveTypeStats(BaseModel):
+class SemanticCategoryStats(BaseModel):
     average_score: float
     max_score: float
     segments_count: int
@@ -89,8 +89,8 @@ class LoveTypeStats(BaseModel):
 
 class AnalyzeResponse(BaseModel):
     success: bool
-    statistics_by_type: Optional[Dict[str, LoveTypeStats]] = None
-    segments_with_love_content: Optional[int] = None
+    statistics_by_type: Optional[Dict[str, SemanticCategoryStats]] = None
+    segments_with_semantic_content: Optional[int] = None
     total_segments: Optional[int] = None
     enriched_data: Optional[Dict] = None
     error: Optional[str] = None
@@ -118,8 +118,8 @@ class PhraseData(BaseModel):
     end_time: float
     duration: float
     keywords_found: Optional[List[str]] = None
-    love_type: Optional[str] = None
-    love_analysis: Optional[Dict[str, float]] = None
+    semantic_category: Optional[str] = None
+    semantic_analysis: Optional[Dict[str, float]] = None
 
 
 class GenerateMixResponse(BaseModel):
@@ -183,7 +183,7 @@ class ModelsStatus(BaseModel):
     whisper: bool = False
     whisper_model: Optional[str] = None
     whisper_backend: Optional[str] = None
-    love_analyzer: bool = False
+    semantic_analyzer: bool = False
     mix_player: bool = False
     mix_player_words_indexed: int = 0
 

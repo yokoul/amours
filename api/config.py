@@ -1,5 +1,5 @@
 """
-Configuration for the Amours API server.
+Configuration for the Scribe(s) API server.
 
 All settings are loaded from environment variables with sensible defaults
 for local development.
@@ -10,53 +10,53 @@ from pathlib import Path
 
 
 # Project root (parent of api/)
-PROJECT_ROOT = Path(os.environ.get("AMOURS_PROJECT_ROOT", Path(__file__).parent.parent))
+PROJECT_ROOT = Path(os.environ.get("SCRIBE_PROJECT_ROOT", Path(__file__).parent.parent))
 
 # Directories
-AUDIO_DIR = Path(os.environ.get("AMOURS_AUDIO_DIR", PROJECT_ROOT / "audio"))
+AUDIO_DIR = Path(os.environ.get("SCRIBE_AUDIO_DIR", PROJECT_ROOT / "audio"))
 TRANSCRIPTION_DIR = Path(
-    os.environ.get("AMOURS_TRANSCRIPTION_DIR", PROJECT_ROOT / "output_transcription")
+    os.environ.get("SCRIBE_TRANSCRIPTION_DIR", PROJECT_ROOT / "output_transcription")
 )
 SEMANTIC_DIR = Path(
-    os.environ.get("AMOURS_SEMANTIC_DIR", PROJECT_ROOT / "output_semantic")
+    os.environ.get("SCRIBE_SEMANTIC_DIR", PROJECT_ROOT / "output_semantic")
 )
 SENTENCES_DIR = Path(
-    os.environ.get("AMOURS_SENTENCES_DIR", PROJECT_ROOT / "output_sentences")
+    os.environ.get("SCRIBE_SENTENCES_DIR", PROJECT_ROOT / "output_sentences")
 )
 MIX_PLAY_DIR = Path(
-    os.environ.get("AMOURS_MIX_PLAY_DIR", PROJECT_ROOT / "output_mix_play")
+    os.environ.get("SCRIBE_MIX_PLAY_DIR", PROJECT_ROOT / "output_mix_play")
 )
 GENERATED_AUDIO_DIR = Path(
     os.environ.get(
-        "AMOURS_GENERATED_AUDIO_DIR", PROJECT_ROOT / "web-interface" / "public" / "audio"
+        "SCRIBE_GENERATED_AUDIO_DIR", PROJECT_ROOT / "web-interface" / "public" / "audio"
     )
 )
 FRAMES_DIR = Path(
     os.environ.get(
-        "AMOURS_FRAMES_DIR", PROJECT_ROOT / "web-interface" / "public" / "frames"
+        "SCRIBE_FRAMES_DIR", PROJECT_ROOT / "web-interface" / "public" / "frames"
     )
 )
 
 # Upload settings
-UPLOAD_DIR = Path(os.environ.get("AMOURS_UPLOAD_DIR", PROJECT_ROOT / "audio" / "uploads"))
-MAX_UPLOAD_SIZE_MB = int(os.environ.get("AMOURS_MAX_UPLOAD_MB", "500"))
+UPLOAD_DIR = Path(os.environ.get("SCRIBE_UPLOAD_DIR", PROJECT_ROOT / "audio" / "uploads"))
+MAX_UPLOAD_SIZE_MB = int(os.environ.get("SCRIBE_MAX_UPLOAD_MB", "500"))
 
 # Whisper model
-WHISPER_MODEL = os.environ.get("AMOURS_WHISPER_MODEL", "medium")
-WHISPER_LANGUAGE = os.environ.get("AMOURS_WHISPER_LANGUAGE", "fr")
-WHISPER_DEVICE = os.environ.get("AMOURS_WHISPER_DEVICE", "")  # "" = auto-detect
-WHISPER_BACKEND = os.environ.get("AMOURS_WHISPER_BACKEND", "auto")  # auto, faster-whisper, openai-whisper
+WHISPER_MODEL = os.environ.get("SCRIBE_WHISPER_MODEL", "medium")
+WHISPER_LANGUAGE = os.environ.get("SCRIBE_WHISPER_LANGUAGE", "fr")
+WHISPER_DEVICE = os.environ.get("SCRIBE_WHISPER_DEVICE", "")  # "" = auto-detect
+WHISPER_BACKEND = os.environ.get("SCRIBE_WHISPER_BACKEND", "auto")  # auto, faster-whisper, openai-whisper
 
-# Love analyzer
-LOVE_SCORE_THRESHOLD = float(os.environ.get("AMOURS_LOVE_THRESHOLD", "0.1"))
+# Semantic analyzer
+SEMANTIC_SCORE_THRESHOLD = float(os.environ.get("SCRIBE_SEMANTIC_THRESHOLD", "0.1"))
 
 # Server
-HOST = os.environ.get("AMOURS_HOST", "0.0.0.0")
-PORT = int(os.environ.get("AMOURS_PORT", "8000"))
-CORS_ORIGINS = os.environ.get("AMOURS_CORS_ORIGINS", "*").split(",")
+HOST = os.environ.get("SCRIBE_HOST", "0.0.0.0")
+PORT = int(os.environ.get("SCRIBE_PORT", "8000"))
+CORS_ORIGINS = os.environ.get("SCRIBE_CORS_ORIGINS", "*").split(",")
 
 # Workers (for uvicorn)
-WORKERS = int(os.environ.get("AMOURS_WORKERS", "1"))
+WORKERS = int(os.environ.get("SCRIBE_WORKERS", "1"))
 
 
 def ensure_directories():

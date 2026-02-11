@@ -17,7 +17,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 import numpy as np
 
-logger = logging.getLogger("amours.live_transcriber")
+logger = logging.getLogger("scribe.live_transcriber")
 
 # Audio constants
 SAMPLE_RATE = 16000
@@ -43,7 +43,7 @@ class LiveSegment:
     words: List[Dict[str, Any]] = field(default_factory=list)
     is_partial: bool = False
     speaker: Optional[str] = None
-    love_analysis: Optional[Dict[str, float]] = None
+    semantic_analysis: Optional[Dict[str, float]] = None
 
 
 @dataclass
@@ -56,7 +56,7 @@ class LiveTranscriberConfig:
     max_segment_seconds: float = DEFAULT_MAX_SEGMENT_S
     padding_ms: int = DEFAULT_PADDING_MS
     language: str = "fr"
-    with_love_analysis: bool = False
+    with_semantic_analysis: bool = False
 
 
 class LiveTranscriber:
@@ -70,7 +70,7 @@ class LiveTranscriber:
     def __init__(
         self,
         transcriber: Any,
-        love_analyzer: Optional[Any] = None,
+        semantic_analyzer: Optional[Any] = None,
         config: Optional[LiveTranscriberConfig] = None,
     ):
         """
@@ -78,11 +78,11 @@ class LiveTranscriber:
 
         Args:
             transcriber: Instance de FastTranscriber ou AudioTranscriber
-            love_analyzer: Instance optionnelle de LoveTypeAnalyzer
+            semantic_analyzer: Instance optionnelle d'analyseur semantique
             config: Configuration du live transcriber
         """
         self.transcriber = transcriber
-        self.love_analyzer = love_analyzer
+        self.semantic_analyzer = semantic_analyzer
         self.config = config or LiveTranscriberConfig()
 
         # Silero VAD
@@ -343,15 +343,15 @@ class LiveTranscriber:
 
             # Analyse semantique optionnelle
             if (
-                self.config.with_love_analysis
-                and self.love_analyzer is not None
+                self.config.with_semantic_analysis
+                and self.semantic_analyzer is not None
             ):
                 try:
-                    scores = self.love_analyzer.analyze_segment(text)
+                    scores = self.semantic_analyzer.analyze_segment(text)
                     if scores:
-                        segment.love_analysis = scores
+                        segment.semantic_analysis = scores
                 except Exception as e:
-                    logger.debug("Love analysis failed for segment: %s", e)
+                    logger.debug("Semantic analysis failed for segment: %s", e)
 
             logger.info(
                 "Segment #%d [%.1f-%.1fs]: %s",

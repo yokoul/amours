@@ -1,8 +1,8 @@
 """
-Amours API — FastAPI application.
+Scribe(s) API — FastAPI application.
 
 Persistent Python process that loads ML models once at startup and
-exposes the full Amours pipeline via REST endpoints.
+exposes the full Scribe(s) pipeline via REST endpoints.
 
 All route names and response formats match the existing Express
 (poetic-server.js) contract so the vanilla JS frontend works unchanged.
@@ -62,7 +62,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
 )
-logger = logging.getLogger("amours.api")
+logger = logging.getLogger("scribe.api")
 
 # ── In-memory job store (contribution uploads) ────────────────
 
@@ -81,17 +81,17 @@ async def lifespan(app: FastAPI):
         whisper_language=config.WHISPER_LANGUAGE,
         whisper_device=config.WHISPER_DEVICE,
         whisper_backend=config.WHISPER_BACKEND,
-        love_threshold=config.LOVE_SCORE_THRESHOLD,
+        semantic_threshold=config.SEMANTIC_SCORE_THRESHOLD,
         transcription_dir=str(config.TRANSCRIPTION_DIR),
         audio_dir=str(config.AUDIO_DIR),
     )
     yield
-    logger.info("Shutting down Amours API")
+    logger.info("Shutting down Scribe(s) API")
 
 
 app = FastAPI(
-    title="Amours API",
-    description="Audio transcription and semantic love analysis",
+    title="Scribe(s) API",
+    description="Audio/video transcription and semantic analysis",
     version="2.0.0",
     lifespan=lifespan,
 )
@@ -122,7 +122,7 @@ async def health():
             whisper=models.transcriber is not None,
             whisper_model=config.WHISPER_MODEL,
             whisper_backend=models._whisper_backend,
-            love_analyzer=models.love_analyzer is not None,
+            semantic_analyzer=models.semantic_analyzer is not None,
             mix_player=models.mix_player is not None,
             mix_player_words_indexed=mix_words,
         ),
@@ -253,12 +253,12 @@ async def transcribe(
                 except Exception as e:
                     logger.warning("Frame extraction failed: %s", e)
 
-        # ── Love analysis ──
-        love_data = None
-        if opts.with_love_analysis and models.love_analyzer:
-            enriched = models.love_analyzer.analyze_transcription(result)
-            love_data = enriched.get("love_analysis")
-            result["love_analysis"] = love_data
+        # ── Semantic analysis ──
+        semantic_data = None
+        if opts.with_semantic_analysis and models.semantic_analyzer:
+            enriched = models.semantic_analyzer.analyze_transcription(result)
+            semantic_data = enriched.get("love_analysis")
+            result["semantic_analysis"] = semantic_data
 
         _save_transcription(result, audio_path)
         models.reload_mix_player_index()
@@ -277,7 +277,7 @@ async def transcribe(
             },
             "text": transcription.get("text"),
             "segments": transcription.get("segments"),
-            "love_analysis": love_data,
+            "semantic_analysis": semantic_data,
         }
 
         if video_source:
@@ -310,14 +310,14 @@ def _save_transcription(result: Dict, audio_path: str):
         logger.warning("Could not save transcription: %s", e)
 
 
-# ── Love Analysis ──────────────────────────────────────────────
+# ── Semantic Analysis ─────────────────────────────────────────
 
 
 @app.post("/api/analyze", response_model=AnalyzeResponse)
-async def analyze_love(request: AnalyzeRequest):
-    """Run semantic love type analysis on existing transcription data."""
-    if models.love_analyzer is None:
-        raise HTTPException(503, "Love analyzer model not loaded")
+async def analyze_semantic(request: AnalyzeRequest):
+    """Run semantic analysis on existing transcription data."""
+    if models.semantic_analyzer is None:
+        raise HTTPException(503, "Semantic analyzer model not loaded")
 
     try:
         if request.transcription_data:
@@ -337,28 +337,28 @@ async def analyze_love(request: AnalyzeRequest):
                 400, "Provide either transcription_file or transcription_data"
             )
 
-        enriched = models.love_analyzer.analyze_transcription(data)
-        love = enriched.get("love_analysis", {})
+        enriched = models.semantic_analyzer.analyze_transcription(data)
+        analysis = enriched.get("love_analysis", {})
 
         if request.transcription_file:
             stem = Path(request.transcription_file).stem
-            out_path = config.SEMANTIC_DIR / f"{stem}_love_analysis.json"
+            out_path = config.SEMANTIC_DIR / f"{stem}_semantic_analysis.json"
             with open(out_path, "w", encoding="utf-8") as f:
                 json.dump(enriched, f, ensure_ascii=False, indent=2)
 
-        stats = love.get("statistics_by_type", {})
+        stats = analysis.get("statistics_by_type", {})
         return AnalyzeResponse(
             success=True,
             statistics_by_type=stats,
-            segments_with_love_content=love.get("segments_with_love_content"),
-            total_segments=love.get("total_segments"),
+            segments_with_semantic_content=analysis.get("segments_with_love_content"),
+            total_segments=analysis.get("total_segments"),
             enriched_data=enriched,
         )
 
     except HTTPException:
         raise
     except Exception as e:
-        logger.exception("Love analysis failed")
+        logger.exception("Semantic analysis failed")
         return AnalyzeResponse(success=False, error=str(e))
 
 
@@ -399,9 +399,9 @@ async def generate(request: GenerateMixRequest):
                 output_path=output_path,
             )
 
-            love_scores = None
-            if models.love_analyzer:
-                love_scores = models.love_analyzer.analyze_segment(composed.text)
+            semantic_scores = None
+            if models.semantic_analyzer:
+                semantic_scores = models.semantic_analyzer.analyze_segment(composed.text)
 
             phrase_data = {
                 "index": i,
@@ -422,10 +422,10 @@ async def generate(request: GenerateMixRequest):
                     {"word": w.word, "start": w.start, "end": w.end}
                     for w in composed.words
                 ],
-                "love_type": (
-                    max(love_scores, key=love_scores.get) if love_scores else None
+                "semantic_category": (
+                    max(semantic_scores, key=semantic_scores.get) if semantic_scores else None
                 ),
-                "love_analysis": love_scores,
+                "semantic_analysis": semantic_scores,
             }
             phrases.append(phrase_data)
             audio_files.append(output_path)
@@ -441,8 +441,8 @@ async def generate(request: GenerateMixRequest):
         # Aggregate semantic scores
         agg_scores = {}
         for p in phrases:
-            if p.get("love_analysis"):
-                for k, v in p["love_analysis"].items():
+            if p.get("semantic_analysis"):
+                for k, v in p["semantic_analysis"].items():
                     agg_scores[k] = agg_scores.get(k, 0) + v
         if agg_scores:
             n = len(phrases)
@@ -493,7 +493,7 @@ async def generate_phrase_audio(phrase_index: int, request: dict):
         segment = segment.fade_in(50).fade_out(50)
 
         keywords = phrase.get("keywords_found", ["extrait"])
-        keyword_str = keywords[0].split("≈")[0] if keywords else "extrait"
+        keyword_str = keywords[0].split("\u2248")[0] if keywords else "extrait"
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         output_name = f"extrait_{keyword_str}_{phrase_index}_{timestamp}.mp3"
         output_path = config.GENERATED_AUDIO_DIR / output_name
@@ -800,15 +800,15 @@ def _process_contribution(job_id: str, audio_path: str, meta: dict):
             "message": "Analyse semantique en cours...",
         }
 
-        if models.love_analyzer:
-            enriched = models.love_analyzer.analyze_transcription(result)
-            love = enriched.get("love_analysis", {})
+        if models.semantic_analyzer:
+            enriched = models.semantic_analyzer.analyze_transcription(result)
+            analysis = enriched.get("love_analysis", {})
             stem = Path(audio_path).stem
-            out_path = config.SEMANTIC_DIR / f"{stem}_love_analysis.json"
+            out_path = config.SEMANTIC_DIR / f"{stem}_semantic_analysis.json"
             with open(out_path, "w", encoding="utf-8") as f:
                 json.dump(enriched, f, ensure_ascii=False, indent=2)
             job["semanticFile"] = out_path.name
-            job["semanticAnalysis"] = love
+            job["semanticAnalysis"] = analysis
 
         # Done
         models.reload_mix_player_index()
@@ -846,12 +846,12 @@ async def processing_status(job_id: str):
 
 @app.get("/api/words")
 async def get_words():
-    """Return a list of inspirational French words about love."""
+    """Return a list of inspirational French words for text composition."""
     words = [
-        "amour", "tendresse", "passion", "desir",
-        "coeur", "caresse", "emotion", "reve",
-        "douceur", "bonheur", "partage", "confiance",
-        "espoir", "lumiere", "intimite", "eternite",
+        "parole", "voix", "silence", "ecoute",
+        "dialogue", "histoire", "memoire", "recit",
+        "emotion", "regard", "pensee", "verite",
+        "espoir", "lumiere", "partage", "confiance",
     ]
     return JSONResponse(words)
 
@@ -933,7 +933,7 @@ async def serve_audio(filename: str):
 
 
 # ── Audio source files ─────────────────────────────────────────
-# Serves original audio sources (like Express: /audio-sources → audio/)
+# Serves original audio sources (like Express: /audio-sources -> audio/)
 
 
 @app.get("/audio-sources/{filename:path}")
@@ -1046,8 +1046,8 @@ async def live_transcribe(websocket):
                         language=user_config.get(
                             "language", config.WHISPER_LANGUAGE
                         ),
-                        with_love_analysis=user_config.get(
-                            "with_love_analysis", False
+                        with_semantic_analysis=user_config.get(
+                            "with_semantic_analysis", False
                         ),
                         vad_threshold=user_config.get("vad_threshold", 0.5),
                         min_silence_ms=user_config.get("min_silence_ms", 700),
@@ -1058,7 +1058,7 @@ async def live_transcribe(websocket):
 
                     live = LiveTranscriber(
                         transcriber=models.transcriber,
-                        love_analyzer=models.love_analyzer,
+                        semantic_analyzer=models.semantic_analyzer,
                         config=lt_config,
                     )
                     live.reset()
@@ -1145,7 +1145,7 @@ def _live_segment_to_dict(seg) -> dict:
         "words": seg.words,
         "is_partial": seg.is_partial,
         "speaker": seg.speaker,
-        "love_analysis": seg.love_analysis,
+        "semantic_analysis": seg.semantic_analysis,
     }
 
 

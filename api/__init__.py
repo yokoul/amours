@@ -1,3 +1,3 @@
 """
-Amours API — FastAPI server for audio transcription and love analysis.
+Scribe(s) API — FastAPI server for audio transcription and semantic analysis.
 """

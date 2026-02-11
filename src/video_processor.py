@@ -16,7 +16,7 @@ from typing import Dict, List, Optional, Tuple
 
 import av
 
-logger = logging.getLogger("amours.video")
+logger = logging.getLogger("scribe.video")
 
 
 @dataclass
@@ -380,7 +380,7 @@ class VideoProcessor:
 
         if frames_dir is None:
             frames_dir = str(
-                Path(tempfile.gettempdir()) / f"amours_frames_{Path(video_path).stem}"
+                Path(tempfile.gettempdir()) / f"scribe_frames_{Path(video_path).stem}"
             )
 
         if segments:

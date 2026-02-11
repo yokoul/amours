@@ -9,7 +9,7 @@ import gc
 import logging
 import time
 
-logger = logging.getLogger("amours.models")
+logger = logging.getLogger("scribe.models")
 
 
 class ModelRegistry:
@@ -17,7 +17,7 @@ class ModelRegistry:
 
     def __init__(self):
         self.transcriber = None
-        self.love_analyzer = None
+        self.semantic_analyzer = None
         self.sentence_reconstructor = None
         self.mix_player = None
         self.audio_processor = None
@@ -36,7 +36,7 @@ class ModelRegistry:
         whisper_language: str = "fr",
         whisper_device: str = "",
         whisper_backend: str = "auto",
-        love_threshold: float = 0.1,
+        semantic_threshold: float = 0.1,
         transcription_dir: str = "output_transcription",
         audio_dir: str = "audio",
     ):
@@ -47,7 +47,7 @@ class ModelRegistry:
         self._load_transcriber(
             whisper_model, whisper_language, whisper_device, whisper_backend
         )
-        self._load_love_analyzer(love_threshold)
+        self._load_semantic_analyzer(semantic_threshold)
         self._load_sentence_reconstructor()
         self._load_mix_player(transcription_dir, audio_dir)
         self._load_audio_processor()
@@ -165,20 +165,20 @@ class ModelRegistry:
                 self._whisper_backend = None
         self._load_times["transcriber"] = time.time() - start
 
-    def _load_love_analyzer(self, threshold: float):
+    def _load_semantic_analyzer(self, threshold: float):
         start = time.time()
         try:
             from src.love_analyzer import LoveTypeAnalyzer
 
-            self.love_analyzer = LoveTypeAnalyzer(
+            self.semantic_analyzer = LoveTypeAnalyzer(
                 min_score_threshold=threshold,
                 use_semantic_analysis=True,
                 reconstruct_sentences=False,
             )
-            logger.info("LoveTypeAnalyzer loaded")
+            logger.info("SemanticAnalyzer loaded")
         except Exception as e:
-            logger.error("Failed to load love analyzer: %s", e)
-        self._load_times["love_analyzer"] = time.time() - start
+            logger.error("Failed to load semantic analyzer: %s", e)
+        self._load_times["semantic_analyzer"] = time.time() - start
 
     def _load_sentence_reconstructor(self):
         start = time.time()

@@ -35,7 +35,7 @@ try:
 except ImportError:
     DIARIZATION_AVAILABLE = False
 
-logger = logging.getLogger("amours.fast_transcriber")
+logger = logging.getLogger("scribe.fast_transcriber")
 
 
 def _get_optimal_device() -> str:

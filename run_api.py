@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Launch the Amours API server.
+Launch the Scribe(s) API server.
 
 Usage:
     python run_api.py
@@ -8,10 +8,10 @@ Usage:
     python run_api.py --backend faster-whisper
 
 Environment variables (also configurable via CLI):
-    AMOURS_PORT            Server port (default: 8000)
-    AMOURS_WHISPER_MODEL   Whisper model size (default: medium)
-    AMOURS_WHISPER_DEVICE  Device: cpu, cuda, or auto (default: auto)
-    AMOURS_WHISPER_BACKEND Backend: auto, faster-whisper, openai-whisper (default: auto)
+    SCRIBE_PORT            Server port (default: 8000)
+    SCRIBE_WHISPER_MODEL   Whisper model size (default: medium)
+    SCRIBE_WHISPER_DEVICE  Device: cpu, cuda, or auto (default: auto)
+    SCRIBE_WHISPER_BACKEND Backend: auto, faster-whisper, openai-whisper (default: auto)
 """
 
 import argparse
@@ -20,7 +20,7 @@ import sys
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Amours API Server")
+    parser = argparse.ArgumentParser(description="Scribe(s) API Server")
     parser.add_argument("--host", default=None, help="Bind host (default: 0.0.0.0)")
     parser.add_argument("--port", type=int, default=None, help="Bind port (default: 8000)")
     parser.add_argument(
@@ -48,15 +48,15 @@ def main():
 
     # CLI args override env vars
     if args.host:
-        os.environ["AMOURS_HOST"] = args.host
+        os.environ["SCRIBE_HOST"] = args.host
     if args.port:
-        os.environ["AMOURS_PORT"] = str(args.port)
+        os.environ["SCRIBE_PORT"] = str(args.port)
     if args.model:
-        os.environ["AMOURS_WHISPER_MODEL"] = args.model
+        os.environ["SCRIBE_WHISPER_MODEL"] = args.model
     if args.device:
-        os.environ["AMOURS_WHISPER_DEVICE"] = args.device
+        os.environ["SCRIBE_WHISPER_DEVICE"] = args.device
     if args.backend:
-        os.environ["AMOURS_WHISPER_BACKEND"] = args.backend
+        os.environ["SCRIBE_WHISPER_BACKEND"] = args.backend
 
     # Import after env is set
     from api.config import HOST, PORT
