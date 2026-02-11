@@ -982,6 +982,173 @@ async def serve_frame(filename: str):
     raise HTTPException(404, f"Frame not found: {filename}")
 
 
+# ── Live transcription (WebSocket) ────────────────────────────
+# Real-time audio transcription via Silero VAD + faster-whisper
+
+
+@app.websocket("/ws/live-transcribe")
+async def live_transcribe(websocket):
+    """
+    WebSocket endpoint for real-time audio transcription.
+
+    Protocol:
+      Client -> Server: binary frames (PCM 16-bit mono 16kHz)
+                        or JSON control messages:
+                          {"type": "start", "config": {...}}
+                          {"type": "stop"}
+      Server -> Client: JSON messages:
+                          {"type": "ready"}
+                          {"type": "segment", "data": {...}}
+                          {"type": "stopped", "summary": {...}}
+                          {"type": "error", "message": "..."}
+    """
+    from starlette.websockets import WebSocketDisconnect
+
+    await websocket.accept()
+
+    if models.transcriber is None:
+        await websocket.send_json(
+            {"type": "error", "message": "Transcriber not loaded"}
+        )
+        await websocket.close()
+        return
+
+    live = None
+    all_segments = []
+
+    try:
+        # Wait for start message
+        await websocket.send_json({"type": "ready"})
+
+        while True:
+            message = await websocket.receive()
+
+            # Text message: control commands
+            if "text" in message:
+                try:
+                    data = json.loads(message["text"])
+                except json.JSONDecodeError:
+                    await websocket.send_json(
+                        {"type": "error", "message": "Invalid JSON"}
+                    )
+                    continue
+
+                msg_type = data.get("type", "")
+
+                if msg_type == "start":
+                    from src.live_transcriber import (
+                        LiveTranscriber,
+                        LiveTranscriberConfig,
+                    )
+
+                    user_config = data.get("config", {})
+                    lt_config = LiveTranscriberConfig(
+                        language=user_config.get(
+                            "language", config.WHISPER_LANGUAGE
+                        ),
+                        with_love_analysis=user_config.get(
+                            "with_love_analysis", False
+                        ),
+                        vad_threshold=user_config.get("vad_threshold", 0.5),
+                        min_silence_ms=user_config.get("min_silence_ms", 700),
+                        max_segment_seconds=user_config.get(
+                            "max_segment_seconds", 30.0
+                        ),
+                    )
+
+                    live = LiveTranscriber(
+                        transcriber=models.transcriber,
+                        love_analyzer=models.love_analyzer,
+                        config=lt_config,
+                    )
+                    live.reset()
+                    all_segments = []
+
+                    await websocket.send_json(
+                        {"type": "started", "config": user_config}
+                    )
+                    logger.info("Live transcription started")
+
+                elif msg_type == "stop":
+                    if live is not None:
+                        # Flush remaining audio
+                        final_segments = live.flush()
+                        for seg in final_segments:
+                            seg_data = _live_segment_to_dict(seg)
+                            all_segments.append(seg_data)
+                            await websocket.send_json(
+                                {"type": "segment", "data": seg_data}
+                            )
+
+                        summary = {
+                            "total_segments": len(all_segments),
+                            "total_duration": round(live.elapsed_time, 2),
+                            "full_text": " ".join(
+                                s["text"] for s in all_segments
+                            ),
+                        }
+                        live.stop()
+                        live = None
+
+                        await websocket.send_json(
+                            {"type": "stopped", "summary": summary}
+                        )
+                        logger.info(
+                            "Live transcription stopped: %d segments, %.1fs",
+                            summary["total_segments"],
+                            summary["total_duration"],
+                        )
+                    break
+
+            # Binary message: audio data
+            elif "bytes" in message:
+                if live is None:
+                    await websocket.send_json(
+                        {
+                            "type": "error",
+                            "message": "Send {\"type\": \"start\"} first",
+                        }
+                    )
+                    continue
+
+                audio_bytes = message["bytes"]
+                segments = live.process_audio_chunk(audio_bytes)
+
+                for seg in segments:
+                    seg_data = _live_segment_to_dict(seg)
+                    all_segments.append(seg_data)
+                    await websocket.send_json(
+                        {"type": "segment", "data": seg_data}
+                    )
+
+    except WebSocketDisconnect:
+        logger.info("Live transcription client disconnected")
+        if live is not None:
+            live.stop()
+    except Exception as e:
+        logger.exception("Live transcription error")
+        try:
+            await websocket.send_json(
+                {"type": "error", "message": str(e)}
+            )
+        except Exception:
+            pass
+
+
+def _live_segment_to_dict(seg) -> dict:
+    """Convert a LiveSegment to a JSON-serializable dict."""
+    return {
+        "id": seg.id,
+        "start": seg.start,
+        "end": seg.end,
+        "text": seg.text,
+        "words": seg.words,
+        "is_partial": seg.is_partial,
+        "speaker": seg.speaker,
+        "love_analysis": seg.love_analysis,
+    }
+
+
 # ── Static frontend (mounted last so API routes take priority) ─
 # Serves web-interface/public/ at root, including poetic-interface.html
 

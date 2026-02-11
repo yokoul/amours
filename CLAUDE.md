@@ -22,6 +22,7 @@ amours/
 │   ├── audio_processor.py      # Audio format conversion & normalization
 │   ├── mix_player.py           # Audio composition engine (Mix-Play)
 │   ├── video_processor.py      # Video demuxing, audio extraction, frame thumbnails (PyAV)
+│   ├── live_transcriber.py     # Real-time transcription (Silero VAD + streaming Whisper)
 │   ├── export.py               # JSON/CSV export
 │   ├── enriched_export.py      # Advanced export with metadata
 │   ├── main.py                 # Basic CLI entry point
@@ -195,6 +196,19 @@ Both backends expose the same interface (`transcribe_with_timestamps`, `transcri
 
 Frame images are served at `GET /frames/{video_stem}/{filename}`.
 
+### Live transcription
+
+`live_transcriber.py` provides real-time audio transcription via WebSocket (`/ws/live-transcribe`). The pipeline:
+
+1. **Client** sends PCM audio chunks (16-bit mono 16kHz) via WebSocket binary frames
+2. **Silero VAD** detects speech activity frame-by-frame, buffering audio
+3. **Speech end detection**: When silence exceeds `min_silence_ms` (default 700ms), the speech segment is finalized
+4. **faster-whisper** transcribes each finalized segment
+5. **Optional love analysis** runs on each transcribed segment
+6. **Server** pushes JSON results back via WebSocket as they become available
+
+Protocol: client sends `{"type": "start"}` to begin, binary audio frames during recording, `{"type": "stop"}` to end. Server responds with `{"type": "segment", "data": {...}}` for each transcribed segment.
+
 ### Mix-Play system
 
 `mix_player.py` builds a word index from transcription outputs and lets users compose new audio phrases by searching/selecting individual words across multiple speakers and source files. Features fuzzy matching, source diversification, and quality scoring.
@@ -205,7 +219,7 @@ FastAPI application (`run_api.py`) that loads all ML models once at startup and 
 
 Key design: `api/models.py` holds a global `ModelRegistry` singleton. The `lifespan` handler in `app.py` calls `models.load_all()` once. All endpoints share the same in-memory models.
 
-Endpoints: `POST /api/transcribe` (audio + video), `POST /api/analyze`, `POST /api/generate`, `GET /api/search`, `GET /api/search-sources`, `POST /api/extract-search-audio`, `POST /api/upload-contribution`, `GET /api/processing-status/{jobId}`, `GET /api/words`, `GET /api/random-words/{count}`, `GET /api/archive`, `POST /api/reload-index`, `GET /health`, `GET /frames/{path}` (video thumbnails).
+Endpoints: `POST /api/transcribe` (audio + video), `POST /api/analyze`, `POST /api/generate`, `GET /api/search`, `GET /api/search-sources`, `POST /api/extract-search-audio`, `POST /api/upload-contribution`, `GET /api/processing-status/{jobId}`, `GET /api/words`, `GET /api/random-words/{count}`, `GET /api/archive`, `POST /api/reload-index`, `GET /health`, `GET /frames/{path}` (video thumbnails), `WS /ws/live-transcribe` (real-time).
 
 Configuration via environment variables (see `api/config.py`) or CLI flags on `run_api.py`.
 
