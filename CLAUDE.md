@@ -4,8 +4,8 @@
 
 Amours is a French audio transcription and semantic analysis system that detects and classifies 7 types of love (romantique, familial, amical, spirituel, erotique, narcissique, platonique) in audio recordings. It combines Whisper AI transcription with sentence-transformer-based NLP to produce word-level timecoded transcriptions, speaker detection, and creative audio compositions (Mix-Play).
 
-**Version:** 1.4.0
-**Language:** Python 3.9+ (core), Node.js (web interface)
+**Version:** 2.0.0
+**Language:** Python 3.9+ (core + API), Node.js (legacy web interface)
 **Author:** Yan
 
 ## Repository Structure
@@ -37,6 +37,14 @@ amours/
 │   ├── poetic-server.js        # Poetic interface server (primary)
 │   ├── public/                 # Static frontend (vanilla JS, p5.js)
 │   └── python-bridge/          # Python-Node.js API bridge
+│
+├── api/                        # FastAPI server (persistent Python process)
+│   ├── app.py                  # Main FastAPI application + all endpoints
+│   ├── config.py               # Environment-based configuration
+│   ├── models.py               # Singleton ML model registry (loaded once)
+│   └── schemas.py              # Pydantic request/response models
+│
+├── run_api.py                  # API server entry point
 │
 ├── gen/                        # Future voice generation features (stubs)
 │
@@ -83,29 +91,24 @@ Alternatively, run `./setup.sh` which automates venv creation, dependency instal
 ## Common Commands
 
 ```bash
-# Format code
-black .
+# ── API server (recommended) ──
+python run_api.py                          # Start API on port 8000
+python run_api.py --port 8000 --model large --device cuda  # With options
+# Then: curl http://localhost:8000/health
 
-# Lint
-flake8 .
-
-# Type check
-mypy src/
-
-# Run tests
-pytest
-
-# Run interactive launcher (main entry point)
-python launcher_interactif.py
-
-# Transcribe an audio file
-python transcribe_audio.py --input audio/file.mp3 --reconstruct-sentences --with-semantic-analysis
-
-# Run love analysis on existing transcription
+# ── CLI tools (still functional) ──
+python launcher_interactif.py              # Interactive launcher
+python transcribe_audio.py --input audio/file.mp3 --reconstruct-sentences
 python analyze_love.py --input output_transcription/file_complete.json
 
-# Start web interface
-cd web-interface && node poetic-server.js
+# ── Legacy web interface ──
+cd web-interface && node poetic-server.js  # Port 3000 (uses spawn)
+
+# ── Development ──
+black .          # Format code
+flake8 .         # Lint
+mypy src/ api/   # Type check
+pytest           # Run tests
 ```
 
 ## Code Conventions
@@ -171,9 +174,19 @@ test: ajouter tests pour sentence reconstructor
 
 `mix_player.py` builds a word index from transcription outputs and lets users compose new audio phrases by searching/selecting individual words across multiple speakers and source files. Features fuzzy matching, source diversification, and quality scoring.
 
-### Web interface
+### API server (`api/`)
 
-Express server (`poetic-server.js`) on port 3000 with WebSocket (port 8080) for real-time updates. Frontend uses vanilla JS with p5.js for visualizations. The `python-bridge/api_wrapper.py` bridges Node.js requests to Python processing.
+FastAPI application (`run_api.py`) that loads all ML models once at startup and serves the full pipeline via REST. This replaces the Node.js `spawn()` pattern where each request launched a new Python process (reloading ~2 GB of models each time).
+
+Key design: `api/models.py` holds a global `ModelRegistry` singleton. The `lifespan` handler in `app.py` calls `models.load_all()` once. All endpoints share the same in-memory models.
+
+Endpoints: `POST /api/transcribe`, `POST /api/analyze`, `POST /api/generate-mix`, `GET /api/search`, `POST /api/extract-audio`, `GET /health`, `GET /api/sources`, `GET /api/words`, `POST /api/reload-index`.
+
+Configuration via environment variables (see `api/config.py`) or CLI flags on `run_api.py`.
+
+### Web interface (legacy)
+
+Express server (`poetic-server.js`) on port 3000 with WebSocket (port 8080) for real-time updates. Frontend uses vanilla JS with p5.js for visualizations. The `python-bridge/api_wrapper.py` bridges Node.js requests to Python processing. Being replaced by the FastAPI server above.
 
 ### Key dependencies
 
@@ -186,6 +199,8 @@ Express server (`poetic-server.js`) on port 3000 with WebSocket (port 8080) for 
 | pydub | Audio file manipulation |
 | pyannote.audio | Speaker diarization |
 | torch | Deep learning backend |
+| fastapi | REST API framework |
+| uvicorn | ASGI server |
 
 ## File Patterns and Gitignore
 
