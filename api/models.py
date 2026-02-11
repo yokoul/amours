@@ -21,6 +21,7 @@ class ModelRegistry:
         self.mix_player = None
         self.audio_processor = None
         self.video_processor = None
+        self._whisper_backend = None
         self._ready = False
         self._load_times = {}
 
@@ -33,6 +34,7 @@ class ModelRegistry:
         whisper_model: str = "medium",
         whisper_language: str = "fr",
         whisper_device: str = "",
+        whisper_backend: str = "auto",
         love_threshold: float = 0.1,
         transcription_dir: str = "output_transcription",
         audio_dir: str = "audio",
@@ -41,7 +43,9 @@ class ModelRegistry:
         logger.info("Loading models...")
         total_start = time.time()
 
-        self._load_transcriber(whisper_model, whisper_language, whisper_device)
+        self._load_transcriber(
+            whisper_model, whisper_language, whisper_device, whisper_backend
+        )
         self._load_love_analyzer(love_threshold)
         self._load_sentence_reconstructor()
         self._load_mix_player(transcription_dir, audio_dir)
@@ -54,12 +58,55 @@ class ModelRegistry:
         for name, elapsed in self._load_times.items():
             logger.info("  %s: %.1fs", name, elapsed)
 
-    def _load_transcriber(self, model_name: str, language: str, device: str):
+    def _load_transcriber(
+        self, model_name: str, language: str, device: str, backend: str = "auto"
+    ):
         start = time.time()
+        device_arg = device if device else None
+
+        # Determine backend: auto prefers faster-whisper when available
+        use_faster = False
+        if backend in ("auto", "faster-whisper"):
+            try:
+                import faster_whisper  # noqa: F401
+
+                use_faster = True
+            except ImportError:
+                if backend == "faster-whisper":
+                    logger.error(
+                        "faster-whisper requested but not installed. "
+                        "Install with: pip install faster-whisper"
+                    )
+                else:
+                    logger.info("faster-whisper not available, using openai-whisper")
+
+        if use_faster:
+            try:
+                from src.fast_transcriber import FastTranscriber
+
+                self.transcriber = FastTranscriber(
+                    model_name=model_name,
+                    language=language,
+                    device=device_arg,
+                    enable_diarization=True,
+                    verbose=False,
+                )
+                self._whisper_backend = "faster-whisper"
+                logger.info(
+                    "faster-whisper '%s' loaded on %s (%s)",
+                    model_name,
+                    self.transcriber.device,
+                    self.transcriber.compute_type,
+                )
+                self._load_times["transcriber"] = time.time() - start
+                return
+            except Exception as e:
+                logger.warning("Failed to load faster-whisper: %s", e)
+
+        # Fallback: openai-whisper
         try:
             from src.transcriber_with_speakers import AudioTranscriberWithSpeakers
 
-            device_arg = device if device else None
             self.transcriber = AudioTranscriberWithSpeakers(
                 model_name=model_name,
                 language=language,
@@ -67,8 +114,9 @@ class ModelRegistry:
                 enable_diarization=True,
                 verbose=False,
             )
+            self._whisper_backend = "openai-whisper"
             logger.info(
-                "Whisper '%s' loaded on %s",
+                "openai-whisper '%s' loaded on %s",
                 model_name,
                 getattr(self.transcriber, "device", "unknown"),
             )
@@ -80,12 +128,14 @@ class ModelRegistry:
                 self.transcriber = AudioTranscriber(
                     model_name=model_name,
                     language=language,
-                    device=device if device else None,
+                    device=device_arg,
                     verbose=False,
                 )
+                self._whisper_backend = "openai-whisper"
                 logger.info("Loaded basic transcriber (no speaker diarization)")
             except Exception as e2:
                 logger.error("Failed to load any transcriber: %s", e2)
+                self._whisper_backend = None
         self._load_times["transcriber"] = time.time() - start
 
     def _load_love_analyzer(self, threshold: float):

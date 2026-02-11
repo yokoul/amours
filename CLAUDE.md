@@ -13,7 +13,8 @@ Amours is a French audio transcription and semantic analysis system that detects
 ```
 amours/
 ├── src/                        # Core Python library modules
-│   ├── transcriber.py          # Whisper AI transcription engine
+│   ├── transcriber.py          # Whisper AI transcription engine (openai-whisper)
+│   ├── fast_transcriber.py     # faster-whisper backend (CTranslate2, ~4x faster)
 │   ├── transcriber_with_speakers.py  # Transcription + speaker diarization
 │   ├── simple_transcriber_with_speakers.py  # Lightweight speaker detection
 │   ├── love_analyzer.py        # 7-type love classification via embeddings
@@ -93,7 +94,8 @@ Alternatively, run `./setup.sh` which automates venv creation, dependency instal
 
 ```bash
 # ── API server (recommended) ──
-python run_api.py                          # Start API on port 8000
+python run_api.py                          # Start API on port 8000 (auto-detects faster-whisper)
+python run_api.py --backend faster-whisper # Force faster-whisper backend
 python run_api.py --port 8000 --model large --device cuda  # With options
 # Then: curl http://localhost:8000/health
 
@@ -166,11 +168,20 @@ test: ajouter tests pour sentence reconstructor
 ### Core pipeline
 
 1. **Audio/Video input** -> `audio_processor.py` / `video_processor.py` (format conversion, audio extraction from video)
-2. **Transcription** -> `transcriber.py` / `transcriber_with_speakers.py` (Whisper AI, word-level timecodes)
+2. **Transcription** -> `fast_transcriber.py` (preferred) or `transcriber.py` (Whisper AI, word-level timecodes)
 3. **Frame extraction** (video only) -> `video_processor.py` (one thumbnail per transcription segment, PTS-based seeking)
 4. **Sentence reconstruction** -> `sentence_reconstructor.py` (syntactic reassembly from Whisper segments)
 5. **Semantic analysis** -> `love_analyzer.py` (sentence-transformers embeddings, cosine similarity against love-type reference phrases)
 6. **Export** -> `export.py` / `enriched_export.py` (JSON, CSV, SRT)
+
+### Transcription backends
+
+The system supports two Whisper backends, selected via `AMOURS_WHISPER_BACKEND` env var or `--backend` CLI flag:
+
+- **`faster-whisper`** (default when installed): Uses CTranslate2 for ~4x speedup. Supports `int8` (CPU) and `float16` (GPU) quantization. Built-in VAD filter reduces hallucinations.
+- **`openai-whisper`**: Original OpenAI implementation. Fallback when faster-whisper is not installed.
+
+Both backends expose the same interface (`transcribe_with_timestamps`, `transcribe_with_speakers`) and produce identical output formats. The `ModelRegistry` auto-detects the best available backend at startup.
 
 ### Video processing
 
@@ -206,7 +217,8 @@ Express server (`poetic-server.js`) on port 3000 with WebSocket (port 8080) for 
 
 | Dependency | Purpose |
 |---|---|
-| openai-whisper | Speech-to-text transcription |
+| openai-whisper | Speech-to-text transcription (standard backend) |
+| faster-whisper | CTranslate2 Whisper backend (~4x faster, preferred) |
 | sentence-transformers | Semantic similarity embeddings |
 | scikit-learn | ML classification |
 | librosa | Audio feature extraction |

@@ -80,6 +80,7 @@ async def lifespan(app: FastAPI):
         whisper_model=config.WHISPER_MODEL,
         whisper_language=config.WHISPER_LANGUAGE,
         whisper_device=config.WHISPER_DEVICE,
+        whisper_backend=config.WHISPER_BACKEND,
         love_threshold=config.LOVE_SCORE_THRESHOLD,
         transcription_dir=str(config.TRANSCRIPTION_DIR),
         audio_dir=str(config.AUDIO_DIR),
@@ -120,6 +121,7 @@ async def health():
         models=ModelsStatus(
             whisper=models.transcriber is not None,
             whisper_model=config.WHISPER_MODEL,
+            whisper_backend=models._whisper_backend,
             love_analyzer=models.love_analyzer is not None,
             mix_player=models.mix_player is not None,
             mix_player_words_indexed=mix_words,

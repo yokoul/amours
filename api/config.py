@@ -45,6 +45,7 @@ MAX_UPLOAD_SIZE_MB = int(os.environ.get("AMOURS_MAX_UPLOAD_MB", "500"))
 WHISPER_MODEL = os.environ.get("AMOURS_WHISPER_MODEL", "medium")
 WHISPER_LANGUAGE = os.environ.get("AMOURS_WHISPER_LANGUAGE", "fr")
 WHISPER_DEVICE = os.environ.get("AMOURS_WHISPER_DEVICE", "")  # "" = auto-detect
+WHISPER_BACKEND = os.environ.get("AMOURS_WHISPER_BACKEND", "auto")  # auto, faster-whisper, openai-whisper
 
 # Love analyzer
 LOVE_SCORE_THRESHOLD = float(os.environ.get("AMOURS_LOVE_THRESHOLD", "0.1"))

@@ -182,6 +182,7 @@ class ExtractAudioResponse(BaseModel):
 class ModelsStatus(BaseModel):
     whisper: bool = False
     whisper_model: Optional[str] = None
+    whisper_backend: Optional[str] = None
     love_analyzer: bool = False
     mix_player: bool = False
     mix_player_words_indexed: int = 0

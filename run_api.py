@@ -5,11 +5,13 @@ Launch the Amours API server.
 Usage:
     python run_api.py
     python run_api.py --port 8000 --model large --device cuda
+    python run_api.py --backend faster-whisper
 
 Environment variables (also configurable via CLI):
-    AMOURS_PORT          Server port (default: 8000)
-    AMOURS_WHISPER_MODEL Whisper model size (default: medium)
-    AMOURS_WHISPER_DEVICE Device: cpu, cuda, or auto (default: auto)
+    AMOURS_PORT            Server port (default: 8000)
+    AMOURS_WHISPER_MODEL   Whisper model size (default: medium)
+    AMOURS_WHISPER_DEVICE  Device: cpu, cuda, or auto (default: auto)
+    AMOURS_WHISPER_BACKEND Backend: auto, faster-whisper, openai-whisper (default: auto)
 """
 
 import argparse
@@ -32,6 +34,12 @@ def main():
         help="Compute device: cpu, cuda, or empty for auto-detect",
     )
     parser.add_argument(
+        "--backend",
+        default=None,
+        choices=["auto", "faster-whisper", "openai-whisper"],
+        help="Whisper backend: auto, faster-whisper, openai-whisper (default: auto)",
+    )
+    parser.add_argument(
         "--reload",
         action="store_true",
         help="Enable auto-reload for development",
@@ -47,6 +55,8 @@ def main():
         os.environ["AMOURS_WHISPER_MODEL"] = args.model
     if args.device:
         os.environ["AMOURS_WHISPER_DEVICE"] = args.device
+    if args.backend:
+        os.environ["AMOURS_WHISPER_BACKEND"] = args.backend
 
     # Import after env is set
     from api.config import HOST, PORT
