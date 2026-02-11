@@ -167,22 +167,49 @@ async def transcribe(
     else:
         raise HTTPException(400, "Provide either a file upload or file_url")
 
+    extracted_audio = None  # Track temp WAV from video extraction
+    video_source = None  # Track original video for frame extraction
+
     try:
+        # ── Video detection: extract audio if input is a video ──
+        is_video = False
+        if models.video_processor is not None:
+            try:
+                from src.video_processor import VideoProcessor
+
+                is_video = VideoProcessor.is_video(audio_path)
+            except Exception:
+                pass
+
+        if is_video and models.video_processor is not None:
+            logger.info("Video detected, extracting audio track...")
+            video_source = audio_path
+            extracted_audio = models.video_processor.extract_audio(audio_path)
+            whisper_input = extracted_audio
+        else:
+            whisper_input = audio_path
+
+        # ── Transcription ──
         transcriber = models.transcriber
         has_speakers = hasattr(transcriber, "transcribe_with_speakers")
 
         if opts.detect_speakers and has_speakers:
             result = transcriber.transcribe_with_speakers(
-                audio_path, word_timestamps=opts.word_timestamps
+                whisper_input, word_timestamps=opts.word_timestamps
             )
         elif hasattr(transcriber, "transcribe_with_timestamps"):
             result = transcriber.transcribe_with_timestamps(
-                audio_path, word_timestamps=opts.word_timestamps
+                whisper_input, word_timestamps=opts.word_timestamps
             )
         else:
             raise HTTPException(500, "No transcription method available")
 
-        # Sentence reconstruction
+        # Preserve original source filename in metadata
+        if video_source:
+            result.setdefault("metadata", {})["source_type"] = "video"
+            result["metadata"]["video_path"] = video_source
+
+        # ── Sentence reconstruction ──
         if opts.reconstruct_sentences and models.sentence_reconstructor:
             segments = result.get("transcription", {}).get("segments", [])
             if segments:
@@ -192,7 +219,39 @@ async def transcribe(
                 result["transcription"]["original_segments"] = segments
                 result["transcription"]["segments"] = reconstructed
 
-        # Love analysis
+        # ── Video frame extraction (aligned with transcription) ──
+        thumbnails = []
+        if video_source and models.video_processor is not None:
+            segments = result.get("transcription", {}).get("segments", [])
+            if segments:
+                frames_dir = str(
+                    config.FRAMES_DIR / Path(video_source).stem
+                )
+                try:
+                    extractions = models.video_processor.extract_frames_for_segments(
+                        video_source, segments, frames_dir
+                    )
+                    for ext in extractions:
+                        # Build a URL-friendly path relative to FRAMES_DIR
+                        rel_path = Path(ext.image_path).relative_to(
+                            config.FRAMES_DIR
+                        )
+                        thumbnails.append(
+                            {
+                                "segment_id": ext.segment_id,
+                                "timestamp": ext.timestamp,
+                                "image_url": f"/frames/{rel_path}",
+                                "image_path": ext.image_path,
+                                "width": ext.width,
+                                "height": ext.height,
+                            }
+                        )
+                    result["thumbnails"] = thumbnails
+                    logger.info("%d thumbnails extracted", len(thumbnails))
+                except Exception as e:
+                    logger.warning("Frame extraction failed: %s", e)
+
+        # ── Love analysis ──
         love_data = None
         if opts.with_love_analysis and models.love_analyzer:
             enriched = models.love_analyzer.analyze_transcription(result)
@@ -205,27 +264,36 @@ async def transcribe(
         metadata = result.get("metadata", {})
         transcription = result.get("transcription", {})
 
-        return TranscribeResponse(
-            success=True,
-            metadata={
+        response_data = {
+            "success": True,
+            "metadata": {
                 "file": metadata.get("file", ""),
                 "duration": metadata.get("duration", 0),
                 "language": metadata.get("language"),
                 "model": metadata.get("model"),
                 "speakers_detected": metadata.get("speakers_detected"),
             },
-            text=transcription.get("text"),
-            segments=transcription.get("segments"),
-            love_analysis=love_data,
-        )
+            "text": transcription.get("text"),
+            "segments": transcription.get("segments"),
+            "love_analysis": love_data,
+        }
+
+        if video_source:
+            response_data["metadata"]["source_type"] = "video"
+            response_data["thumbnails"] = thumbnails
+
+        return JSONResponse(response_data)
 
     except Exception as e:
         logger.exception("Transcription failed")
         return TranscribeResponse(success=False, error=str(e))
 
     finally:
+        # Clean up temp files
         if file is not None and os.path.exists(audio_path):
             os.unlink(audio_path)
+        if extracted_audio and os.path.exists(extracted_audio):
+            os.unlink(extracted_audio)
 
 
 def _save_transcription(result: Dict, audio_path: str):
@@ -887,6 +955,29 @@ async def serve_audio_source(filename: str):
         )
 
     raise HTTPException(404, f"Audio source not found: {filename}")
+
+
+# ── Video frame thumbnails ────────────────────────────────────
+# Serves extracted frame images from video transcription
+
+
+@app.get("/frames/{filename:path}")
+async def serve_frame(filename: str):
+    """Serve extracted video frame thumbnails."""
+    file_path = config.FRAMES_DIR / filename
+    if file_path.exists() and file_path.is_file():
+        suffix = file_path.suffix.lower()
+        media_types = {
+            ".jpg": "image/jpeg",
+            ".jpeg": "image/jpeg",
+            ".png": "image/png",
+        }
+        return FileResponse(
+            str(file_path),
+            media_type=media_types.get(suffix, "image/jpeg"),
+        )
+
+    raise HTTPException(404, f"Frame not found: {filename}")
 
 
 # ── Static frontend (mounted last so API routes take priority) ─

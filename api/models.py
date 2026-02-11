@@ -20,6 +20,7 @@ class ModelRegistry:
         self.sentence_reconstructor = None
         self.mix_player = None
         self.audio_processor = None
+        self.video_processor = None
         self._ready = False
         self._load_times = {}
 
@@ -45,6 +46,7 @@ class ModelRegistry:
         self._load_sentence_reconstructor()
         self._load_mix_player(transcription_dir, audio_dir)
         self._load_audio_processor()
+        self._load_video_processor()
 
         self._ready = True
         total_elapsed = time.time() - total_start
@@ -138,6 +140,19 @@ class ModelRegistry:
         except Exception as e:
             logger.error("Failed to load audio processor: %s", e)
         self._load_times["audio_processor"] = time.time() - start
+
+    def _load_video_processor(self):
+        start = time.time()
+        try:
+            from src.video_processor import VideoProcessor
+
+            self.video_processor = VideoProcessor(thumbnail_width=320)
+            logger.info("VideoProcessor loaded")
+        except ImportError:
+            logger.info("VideoProcessor unavailable (PyAV not installed)")
+        except Exception as e:
+            logger.warning("Failed to load video processor: %s", e)
+        self._load_times["video_processor"] = time.time() - start
 
     def reload_mix_player_index(self):
         """Reload Mix-Play word index after new transcriptions are added."""

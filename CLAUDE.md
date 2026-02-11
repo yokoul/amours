@@ -20,6 +20,7 @@ amours/
 │   ├── sentence_reconstructor.py  # Syntax reconstruction from segments
 │   ├── audio_processor.py      # Audio format conversion & normalization
 │   ├── mix_player.py           # Audio composition engine (Mix-Play)
+│   ├── video_processor.py      # Video demuxing, audio extraction, frame thumbnails (PyAV)
 │   ├── export.py               # JSON/CSV export
 │   ├── enriched_export.py      # Advanced export with metadata
 │   ├── main.py                 # Basic CLI entry point
@@ -164,11 +165,24 @@ test: ajouter tests pour sentence reconstructor
 
 ### Core pipeline
 
-1. **Audio input** -> `audio_processor.py` (format conversion, normalization)
+1. **Audio/Video input** -> `audio_processor.py` / `video_processor.py` (format conversion, audio extraction from video)
 2. **Transcription** -> `transcriber.py` / `transcriber_with_speakers.py` (Whisper AI, word-level timecodes)
-3. **Sentence reconstruction** -> `sentence_reconstructor.py` (syntactic reassembly from Whisper segments)
-4. **Semantic analysis** -> `love_analyzer.py` (sentence-transformers embeddings, cosine similarity against love-type reference phrases)
-5. **Export** -> `export.py` / `enriched_export.py` (JSON, CSV, SRT)
+3. **Frame extraction** (video only) -> `video_processor.py` (one thumbnail per transcription segment, PTS-based seeking)
+4. **Sentence reconstruction** -> `sentence_reconstructor.py` (syntactic reassembly from Whisper segments)
+5. **Semantic analysis** -> `love_analyzer.py` (sentence-transformers embeddings, cosine similarity against love-type reference phrases)
+6. **Export** -> `export.py` / `enriched_export.py` (JSON, CSV, SRT)
+
+### Video processing
+
+`video_processor.py` handles video files transparently within the existing pipeline. When `/api/transcribe` receives a video file, the flow is:
+
+1. **Detection**: `VideoProcessor.is_video()` checks for video streams via PyAV
+2. **Audio extraction**: Demuxes audio to WAV mono 16kHz (Whisper-compatible)
+3. **Transcription**: Standard Whisper pipeline runs on the extracted audio
+4. **Frame extraction**: One thumbnail per transcription segment at the segment midpoint (PTS-based seeking)
+5. **Response**: Includes `thumbnails` array with `image_url`, `segment_id`, `timestamp`, `width`, `height`
+
+Frame images are served at `GET /frames/{video_stem}/{filename}`.
 
 ### Mix-Play system
 
@@ -180,7 +194,7 @@ FastAPI application (`run_api.py`) that loads all ML models once at startup and 
 
 Key design: `api/models.py` holds a global `ModelRegistry` singleton. The `lifespan` handler in `app.py` calls `models.load_all()` once. All endpoints share the same in-memory models.
 
-Endpoints: `POST /api/transcribe`, `POST /api/analyze`, `POST /api/generate-mix`, `GET /api/search`, `POST /api/extract-audio`, `GET /health`, `GET /api/sources`, `GET /api/words`, `POST /api/reload-index`.
+Endpoints: `POST /api/transcribe` (audio + video), `POST /api/analyze`, `POST /api/generate`, `GET /api/search`, `GET /api/search-sources`, `POST /api/extract-search-audio`, `POST /api/upload-contribution`, `GET /api/processing-status/{jobId}`, `GET /api/words`, `GET /api/random-words/{count}`, `GET /api/archive`, `POST /api/reload-index`, `GET /health`, `GET /frames/{path}` (video thumbnails).
 
 Configuration via environment variables (see `api/config.py`) or CLI flags on `run_api.py`.
 
@@ -197,6 +211,7 @@ Express server (`poetic-server.js`) on port 3000 with WebSocket (port 8080) for 
 | scikit-learn | ML classification |
 | librosa | Audio feature extraction |
 | pydub | Audio file manipulation |
+| av (PyAV) | Video demuxing, audio/frame extraction (FFmpeg bindings) |
 | pyannote.audio | Speaker diarization |
 | torch | Deep learning backend |
 | fastapi | REST API framework |

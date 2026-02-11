@@ -31,6 +31,11 @@ GENERATED_AUDIO_DIR = Path(
         "AMOURS_GENERATED_AUDIO_DIR", PROJECT_ROOT / "web-interface" / "public" / "audio"
     )
 )
+FRAMES_DIR = Path(
+    os.environ.get(
+        "AMOURS_FRAMES_DIR", PROJECT_ROOT / "web-interface" / "public" / "frames"
+    )
+)
 
 # Upload settings
 UPLOAD_DIR = Path(os.environ.get("AMOURS_UPLOAD_DIR", PROJECT_ROOT / "audio" / "uploads"))
@@ -62,6 +67,7 @@ def ensure_directories():
         SENTENCES_DIR,
         MIX_PLAY_DIR,
         GENERATED_AUDIO_DIR,
+        FRAMES_DIR,
         UPLOAD_DIR,
     ]:
         d.mkdir(parents=True, exist_ok=True)
