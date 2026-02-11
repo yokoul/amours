@@ -1,6 +1,6 @@
-# Core dependencies
-openai-whisper>=20231117
+# Transcription backends (faster-whisper preferred, openai-whisper as fallback)
 faster-whisper>=1.0.0
+# openai-whisper>=20231117  # Optional: only needed if faster-whisper unavailable
 sentence-transformers>=2.2.0
 scikit-learn>=1.3.0
 scipy>=1.11.0

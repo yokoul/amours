@@ -5,6 +5,7 @@ All heavy models (Whisper, sentence-transformers, etc.) are loaded here
 and shared across all request handlers via the global `models` instance.
 """
 
+import gc
 import logging
 import time
 
@@ -58,11 +59,37 @@ class ModelRegistry:
         for name, elapsed in self._load_times.items():
             logger.info("  %s: %.1fs", name, elapsed)
 
+    def _release_transcriber(self):
+        """Free the current transcriber and reclaim GPU/CPU memory."""
+        if self.transcriber is None:
+            return
+        old_backend = self._whisper_backend or "unknown"
+        # Drop model references
+        if hasattr(self.transcriber, "model"):
+            del self.transcriber.model
+        if hasattr(self.transcriber, "diarization_pipeline"):
+            del self.transcriber.diarization_pipeline
+        self.transcriber = None
+        self._whisper_backend = None
+        # Force garbage collection to reclaim memory
+        gc.collect()
+        try:
+            import torch
+
+            if torch.cuda.is_available():
+                torch.cuda.empty_cache()
+        except ImportError:
+            pass
+        logger.info("Released previous transcriber (%s), memory freed", old_backend)
+
     def _load_transcriber(
         self, model_name: str, language: str, device: str, backend: str = "auto"
     ):
         start = time.time()
         device_arg = device if device else None
+
+        # Release any previously loaded transcriber before loading a new one
+        self._release_transcriber()
 
         # Determine backend: auto prefers faster-whisper when available
         use_faster = False
